@@ -71,19 +71,31 @@ function el(tag, attrs={}, children=[]) {
 function taskItem(t){
   const checkbox = el('input', { type:'checkbox', checked: !!t.completed });
   checkbox.addEventListener('change', async ()=>{
-    try{ await api(`/api/tasks/${t.id}/toggle`, { method:'POST', body: JSON.stringify({ completed: checkbox.checked })}); }catch(e){ alert(e.message); checkbox.checked=!checkbox.checked; }
+    const prev = !checkbox.checked;
+    try{ await api(`/api/tasks/${t.id}/toggle`, { method:'POST', body: JSON.stringify({ completed: checkbox.checked })}); }
+    catch(e){ alert(e.message); checkbox.checked = prev; }
   });
 
   const title = el('input', { type:'text', value: t.title, class: 'title', title: t.title, spellcheck: false });
   title.addEventListener('change', async ()=>{
-    try{ await api(`/api/tasks/${t.id}`, { method:'PUT', body: JSON.stringify({ title: title.value, description: t.description||'', quadrant: t.quadrant })}); }catch(e){ alert(e.message); }
+    const prev = t.title;
+    t.title = title.value;
+    try{ await api(`/api/tasks/${t.id}`, { method:'PUT', body: JSON.stringify({ title: title.value, description: t.description||'', quadrant: t.quadrant })}); }
+    catch(e){ alert(e.message); t.title = prev; title.value = prev; }
   });
 
   const del = el('button', { class: 'btn', text:'Delete', onclick: async ()=>{
     const lang = localStorage.getItem(STORAGE_KEYS.lang) || 'en';
     const dict = TRANSLATIONS[TRANSLATIONS[lang]?lang:'en'];
     if (!confirm(dict.delete_confirm)) return;
-    try{ await api(`/api/tasks/${t.id}`, { method:'DELETE' }); await loadTasks(); }catch(e){ alert(e.message); }
+    // Optimistic remove
+    const parent = li.parentElement;
+    const id = t.id;
+    if (Array.isArray(window.__tasks_cache)) window.__tasks_cache = window.__tasks_cache.filter(x=>x.id!==id);
+    if (parent) parent.removeChild(li);
+    renderStats(window.__tasks_cache||[]);
+    try{ await api(`/api/tasks/${id}`, { method:'DELETE' }); }
+    catch(e){ alert(e.message); loadTasks(); }
   }});
 
   const li = el('li', { class:'task', draggable: true });
@@ -118,7 +130,17 @@ function setupDnD(){
       if (!dragged) return;
       const id = dragged.dataset.id;
       const quadrant = q.dataset.quadrant;
-      try{ await api(`/api/tasks/${id}/move`, { method:'POST', body: JSON.stringify({ quadrant })}); await loadTasks(); }catch(err){ alert(err.message); }
+      // Optimistic DOM move
+      const list = q.querySelector('ul');
+      if (list) list.append(dragged);
+      if (Array.isArray(window.__tasks_cache)){
+        const t = window.__tasks_cache.find(x=>x.id===id);
+        if (t) t.quadrant = quadrant;
+        renderStats(window.__tasks_cache);
+      }
+      // Async persist
+      try{ await api(`/api/tasks/${id}/move`, { method:'POST', body: JSON.stringify({ quadrant })}); }
+      catch(err){ alert(err.message); loadTasks(); }
     });
   });
 }
@@ -167,7 +189,28 @@ function setupCreate(){
     const title = $('#newTaskTitle').value.trim();
     const quadrant = $('#newTaskQuadrant').value;
     if (!title) return;
-    try{ await api('/api/tasks', { method:'POST', body: JSON.stringify({ title, quadrant })}); $('#newTaskTitle').value=''; await loadTasks(); }catch(err){ alert(err.message); }
+    // Optimistic add
+    const tempId = 'cid_' + Math.random().toString(36).slice(2);
+    const task = { id: tempId, title, description:'', quadrant, completed: 0 };
+    if (!Array.isArray(window.__tasks_cache)) window.__tasks_cache = [];
+    window.__tasks_cache.unshift({ ...task });
+    const list = document.querySelector(`#list-${quadrant}`);
+    if (list) list.prepend(taskItem(task));
+    renderStats(window.__tasks_cache);
+    $('#newTaskTitle').value='';
+    try{
+      const { task: saved } = await api('/api/tasks', { method:'POST', body: JSON.stringify({ id: tempId, title, quadrant })});
+      // Replace cache entry if needed (ids match because we sent id)
+      const idx = window.__tasks_cache.findIndex(x=>x.id===tempId);
+      if (idx !== -1) window.__tasks_cache[idx] = saved;
+    }catch(err){
+      alert(err.message);
+      // Rollback UI
+      window.__tasks_cache = window.__tasks_cache.filter(x=>x.id!==tempId);
+      const elTmp = document.querySelector(`li.task[data-id="${tempId}"]`);
+      if (elTmp && elTmp.parentElement) elTmp.parentElement.removeChild(elTmp);
+      renderStats(window.__tasks_cache);
+    }
   });
 }
 
