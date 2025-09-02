@@ -1,5 +1,5 @@
 const express = require('express');
-const session = require('express-session');
+const cookieSession = require('cookie-session');
 const path = require('path');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -22,15 +22,13 @@ app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'dev_secret_change_me',
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    httpOnly: true,
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    secure: process.env.NODE_ENV === 'production'
-  }
+app.use(cookieSession({
+  name: 'sid',
+  keys: [process.env.SESSION_SECRET || 'dev_secret_change_me'],
+  httpOnly: true,
+  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+  secure: process.env.NODE_ENV === 'production',
+  maxAge: 1000 * 60 * 60 * 24 * 30
 }));
 
 app.use('/api/auth', authRoutes);
