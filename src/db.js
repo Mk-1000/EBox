@@ -15,6 +15,15 @@ const {
 const useSSL = String(DB_SSL || '').toLowerCase() === 'true';
 const rejectUnauthorized = String(DB_SSL_REJECT_UNAUTHORIZED || 'false').toLowerCase() === 'true';
 
+// Validate required environment variables
+if (!DB_HOST || !DB_USER || !DB_PASSWORD || !DB_DATABASE) {
+  console.error('Missing required database environment variables:');
+  console.error('DB_HOST:', DB_HOST ? '✓' : '✗');
+  console.error('DB_USER:', DB_USER ? '✓' : '✗');
+  console.error('DB_PASSWORD:', DB_PASSWORD ? '✓' : '✗');
+  console.error('DB_DATABASE:', DB_DATABASE ? '✓' : '✗');
+}
+
 const pool = mysql.createPool({
   host: DB_HOST,
   port: DB_PORT ? Number(DB_PORT) : 3306,
@@ -25,6 +34,8 @@ const pool = mysql.createPool({
   connectionLimit: 10,
   multipleStatements: true,
   ssl: useSSL ? { rejectUnauthorized } : undefined,
+  acquireTimeout: 60000,
+  timeout: 60000,
 });
 
 async function runMigrations() {
@@ -68,9 +79,11 @@ async function runMigrations() {
   }
 }
 
+// Run migrations on startup, but don't crash the process if they fail
+// This allows the app to start even if DB is temporarily unavailable
 runMigrations().catch((err) => {
   console.error('Database migration failed:', err);
-  process.exit(1);
+  console.log('App will continue to run, but database operations may fail');
 });
 
 module.exports = {

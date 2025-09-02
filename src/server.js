@@ -31,6 +31,18 @@ app.use(cookieSession({
   maxAge: 1000 * 60 * 60 * 24 * 30
 }));
 
+// Health check endpoint
+app.get('/api/health', async (req, res) => {
+  try {
+    const { pool } = require('./db');
+    await pool.query('SELECT 1');
+    res.json({ status: 'ok', database: 'connected' });
+  } catch (err) {
+    console.error('Health check failed:', err);
+    res.status(500).json({ status: 'error', database: 'disconnected', error: err.message });
+  }
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/tasks', taskRoutes);
 
