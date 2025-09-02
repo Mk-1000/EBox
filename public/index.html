@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EBox</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon.png">
+  <link rel="icon" type="image/svg+xml" href="/img/favicon.svg">
+  <link rel="stylesheet" href="/css/styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div id="app">
+    <header class="app-header">
+      <h1 class="brand"><img src="/img/logo.png" alt="EBox"><span class="sr-only" data-i18n="app_name">EBox</span></h1>
+      <div class="user-area">
+        <span id="usernameDisplay"></span>
+        <select id="languageSelect" aria-label="Language">
+          <option value="en">English</option>
+          <option value="ar">العربية</option>
+        </select>
+        <button id="themeToggle" class="btn" aria-label="Toggle theme" title="Toggle theme">🌙</button>
+        <button id="logoutBtn" class="btn secondary" hidden data-i18n="logout">Logout</button>
+      </div>
+    </header>
+
+    <main>
+      <section id="authSection" class="card">
+        <h2 data-i18n="sign_in">Sign in</h2>
+        <form id="authForm">
+          <input id="username" placeholder="Username" autocomplete="username" required data-i18n-placeholder="username_placeholder">
+          <input id="password" type="password" placeholder="Password" autocomplete="current-password" required data-i18n-placeholder="password_placeholder">
+          <div class="actions">
+            <button type="submit" class="btn primary" data-i18n="login">Login</button>
+            <button type="button" id="signupBtn" class="btn" data-i18n="create_account">Create account</button>
+          </div>
+          <div id="authError" class="error"></div>
+        </form>
+      </section>
+
+      <section id="appSection" hidden>
+        <div class="toolbar card">
+          <form id="newTaskForm">
+            <input id="newTaskTitle" placeholder="New task title" required data-i18n-placeholder="new_task_placeholder">
+            <select id="newTaskQuadrant">
+              <option value="do_first" data-i18n="q_do_first_opt">Important & Urgent</option>
+              <option value="schedule" data-i18n="q_schedule_opt">Important, Not Urgent</option>
+              <option value="delegate" data-i18n="q_delegate_opt">Not Important, Urgent</option>
+              <option value="eliminate" data-i18n="q_eliminate_opt">Not Important & Not Urgent</option>
+            </select>
+            <button class="btn primary" data-i18n="add">Add</button>
+          </form>
+          <div class="stats" id="stats"></div>
+        </div>
+
+        <div class="grid">
+          <div class="quadrant" data-quadrant="do_first">
+            <h3 data-i18n="q_do_first_title">Do First</h3>
+            <p class="hint" data-i18n="q_do_first_hint">Crises, emergencies, deadlines</p>
+            <ul class="task-list" id="list-do_first"></ul>
+          </div>
+          <div class="quadrant" data-quadrant="schedule">
+            <h3 data-i18n="q_schedule_title">Schedule</h3>
+            <p class="hint" data-i18n="q_schedule_hint">Planning, learning, relationships</p>
+            <ul class="task-list" id="list-schedule"></ul>
+          </div>
+          <div class="quadrant" data-quadrant="delegate">
+            <h3 data-i18n="q_delegate_title">Delegate</h3>
+            <p class="hint" data-i18n="q_delegate_hint">Interruptions, some meetings</p>
+            <ul class="task-list" id="list-delegate"></ul>
+          </div>
+          <div class="quadrant" data-quadrant="eliminate">
+            <h3 data-i18n="q_eliminate_title">Eliminate</h3>
+            <p class="hint" data-i18n="q_eliminate_hint">Distractions & time-wasters</p>
+            <ul class="task-list" id="list-eliminate"></ul>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>
+
+
