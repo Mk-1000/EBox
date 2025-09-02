@@ -13,6 +13,9 @@ const taskRoutes = require('./tasks');
 
 const app = express();
 
+// Trust proxy for secure cookies behind reverse proxies (e.g., Fly.io, Render, Nginx)
+app.set('trust proxy', 1);
+
 app.use(helmet());
 app.use(cors({ origin: true, credentials: true }));
 app.use(morgan('dev'));
@@ -25,8 +28,8 @@ app.use(session({
   saveUninitialized: false,
   cookie: {
     httpOnly: true,
-    sameSite: 'lax',
-    secure: false
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    secure: process.env.NODE_ENV === 'production'
   }
 }));
 

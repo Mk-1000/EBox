@@ -32,8 +32,11 @@ function applyLang(lang){
   localStorage.setItem(STORAGE_KEYS.lang, locale);
 }
 
+const API_BASE = window.API_BASE || (window.location.origin.includes('localhost') ? '' : (window.API_BASE_URL || ''));
+
 async function api(path, opts={}){
-  const res = await fetch(path, { credentials: 'include', headers: { 'Content-Type':'application/json' }, ...opts });
+  const url = API_BASE ? (API_BASE + path) : path;
+  const res = await fetch(url, { credentials: 'include', headers: { 'Content-Type':'application/json' }, ...opts });
   const raw = await res.text();
   let data = null;
   try { data = raw ? JSON.parse(raw) : null; } catch {}
