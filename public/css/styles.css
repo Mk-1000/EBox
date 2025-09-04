@@ -39,7 +39,11 @@ body[data-theme=light] .btn.secondary{background:#f3f4f6;border-color:#e5e7eb}
 .error{color:#f87171;margin-top:8px;min-height:20px}
 .toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .toolbar .move-mobile{display:none}
-.stats{margin-left:auto;color:var(--sub)}
+.toolbar #newTaskForm{display:flex;gap:8px;align-items:center;flex:1 1 auto;flex-wrap:wrap}
+.toolbar #newTaskForm input{order:1;flex:1 1 240px;width:auto;min-width:160px}
+.toolbar #newTaskForm select{order:2;flex:0 0 auto;width:auto}
+.toolbar #newTaskForm .btn{order:3;flex:0 0 auto}
+.stats{margin-left:0;color:var(--sub);flex:1 1 100%}
 .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:16px}
 body[dir=rtl] .grid{direction:rtl}
 .quadrant{min-height:200px;border:1px dashed #274056;border-radius:12px;padding:12px;background:rgba(11,17,23,.4)}
@@ -68,8 +72,14 @@ body[dir=rtl] .task .title{text-align:right}
   .user-area{gap:6px}
   .user-chip{flex:0 0 auto}
   .toolbar{flex-direction:column;align-items:stretch}
+  .toolbar #newTaskForm{width:100%}
   .toolbar .stats{order:3;margin-left:0}
   .toolbar .move-mobile{display:block}
+}
+@media (max-width:480px){
+  .toolbar #newTaskForm input{order:1;flex:1 1 100%;min-width:0}
+  .toolbar #newTaskForm select{order:2;flex:1 1 60%}
+  .toolbar #newTaskForm .btn{order:3}
 }
 
 
