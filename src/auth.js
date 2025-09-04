@@ -50,9 +50,9 @@ router.post('/login', async (req, res) => {
 });
 
 router.post('/logout', (req, res) => {
-  req.session.destroy(() => {
-    res.json({ ok: true });
-  });
+  // cookie-session does not support destroy(); clear by nulling the session
+  req.session = null;
+  res.json({ ok: true });
 });
 
 router.get('/me', (req, res) => {

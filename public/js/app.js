@@ -154,10 +154,40 @@ function setupDnD(){
   });
 }
 
+// Mobile move support: use a select to move the last interacted task
+function setupMobileMove(){
+  const moveSelect = document.querySelector('#moveSelect');
+  if (!moveSelect) return;
+
+  let lastSelectedTaskId = '';
+
+  // Track last focused/changed title as the selected task
+  document.addEventListener('focusin', (e)=>{
+    const li = e.target && e.target.closest && e.target.closest('li.task');
+    if (li && li.dataset && li.dataset.id) lastSelectedTaskId = li.dataset.id;
+  });
+  document.addEventListener('click', (e)=>{
+    const li = e.target && e.target.closest && e.target.closest('li.task');
+    if (li && li.dataset && li.dataset.id) lastSelectedTaskId = li.dataset.id;
+  });
+
+  moveSelect.addEventListener('change', async ()=>{
+    const quadrant = moveSelect.value;
+    if (!quadrant) return;
+    if (!lastSelectedTaskId){ moveSelect.value=''; return; }
+    try{
+      await api(`/api/tasks/${lastSelectedTaskId}/move`, { method:'POST', body: JSON.stringify({ quadrant })});
+      await loadTasks();
+    }catch(err){ alert(err.message); }
+    moveSelect.value='';
+  });
+}
+
 async function checkSession(){
   try{
     const { user } = await api('/api/auth/me');
-    $('#usernameDisplay').textContent = user.username;
+    const shortName = (user.username || '').slice(0, 10);
+    $('#usernameDisplay').textContent = shortName;
     $('#authSection').hidden = true;
     $('#appSection').hidden = false;
     $('#logoutBtn').hidden = false;
@@ -244,7 +274,25 @@ window.addEventListener('DOMContentLoaded', async ()=>{
   setupAuth();
   setupCreate();
   setupDnD();
+  setupMobileMove();
   setupThemeAndLang();
+  // Menu toggle
+  const menuBtn = document.querySelector('#menuToggle');
+  const menu = document.querySelector('#menuDropdown');
+  if (menuBtn && menu){
+    const closeMenu = ()=>{ menu.classList.remove('open'); menuBtn.setAttribute('aria-expanded','false'); menu.setAttribute('aria-hidden','true'); };
+    const openMenu = ()=>{ menu.classList.add('open'); menuBtn.setAttribute('aria-expanded','true'); menu.setAttribute('aria-hidden','false'); };
+    menuBtn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      if (menu.classList.contains('open')) closeMenu(); else openMenu();
+    });
+    document.addEventListener('click', (e)=>{
+      if (!menu.classList.contains('open')) return;
+      if (menu.contains(e.target) || menuBtn.contains(e.target)) return;
+      closeMenu();
+    });
+    document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') closeMenu(); });
+  }
   await checkSession();
 });
 

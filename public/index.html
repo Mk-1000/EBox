@@ -16,13 +16,19 @@
     <header class="app-header">
       <h1 class="brand"><img src="/img/logo.png" alt="EBox"><span class="sr-only" data-i18n="app_name">EBox</span></h1>
       <div class="user-area">
-        <span id="usernameDisplay"></span>
-        <select id="languageSelect" aria-label="Language">
-          <option value="en">English</option>
-          <option value="ar">العربية</option>
-        </select>
-        <button id="themeToggle" class="btn" aria-label="Toggle theme" title="Toggle theme">🌙</button>
-        <button id="logoutBtn" class="btn secondary" hidden data-i18n="logout">Logout</button>
+        <button id="menuToggle" class="btn icon" aria-haspopup="menu" aria-expanded="false" aria-label="Menu" title="Menu">☰</button>
+        <span id="usernameDisplay" class="user-chip" aria-label="Current user"></span>
+        <div id="menuDropdown" class="menu" role="menu" aria-hidden="true">
+          <div class="menu-section">
+            <label for="languageSelect" class="menu-label">Language</label>
+            <select id="languageSelect" aria-label="Language">
+              <option value="en">English</option>
+              <option value="ar">العربية</option>
+            </select>
+          </div>
+          <button id="themeToggle" class="menu-item" role="menuitem">Toggle theme</button>
+          <button id="logoutBtn" class="menu-item danger" role="menuitem" hidden data-i18n="logout">Logout</button>
+        </div>
       </div>
     </header>
 
@@ -53,6 +59,16 @@
             <button class="btn primary" data-i18n="add">Add</button>
           </form>
           <div class="stats" id="stats"></div>
+          <div class="move-mobile">
+            <label for="moveSelect" class="sr-only">Move selected task</label>
+            <select id="moveSelect">
+              <option value="">Move selected task…</option>
+              <option value="do_first">Important & Urgent</option>
+              <option value="schedule">Important, Not Urgent</option>
+              <option value="delegate">Not Important, Urgent</option>
+              <option value="eliminate">Not Important & Not Urgent</option>
+            </select>
+          </div>
         </div>
 
         <div class="grid">
