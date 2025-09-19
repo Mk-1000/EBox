@@ -48,53 +48,178 @@
       </section>
 
       <section id="appSection" hidden>
-        <div class="toolbar card">
-          <form id="newTaskForm">
-            <input id="newTaskTitle" placeholder="New task title" required data-i18n-placeholder="new_task_placeholder">
-            <select id="newTaskQuadrant">
-              <option value="do_first" data-i18n="q_do_first_opt">Important & Urgent</option>
-              <option value="schedule" data-i18n="q_schedule_opt">Important, Not Urgent</option>
-              <option value="delegate" data-i18n="q_delegate_opt">Not Important, Urgent</option>
-              <option value="eliminate" data-i18n="q_eliminate_opt">Not Important & Not Urgent</option>
-            </select>
-            <button class="btn primary" data-i18n="add">Add</button>
-          </form>
-          <div class="stats" id="stats"></div>
-          <div class="move-mobile">
-            <label for="moveSelect" class="sr-only">Move selected task</label>
-            <select id="moveSelect">
-              <option value="">Move selected task…</option>
-              <option value="do_first">Important & Urgent</option>
-              <option value="schedule">Important, Not Urgent</option>
-              <option value="delegate">Not Important, Urgent</option>
-              <option value="eliminate">Not Important & Not Urgent</option>
-            </select>
+        <!-- Eisenhower Box Dashboard -->
+        <div id="projectsDashboard">
+          <div class="toolbar card">
+            <h2>Eisenhower Box</h2>
+            <button id="newProjectBtn" class="btn primary">New Project</button>
+          </div>
+          
+          <div class="eisenhower-grid">
+            <div class="eisenhower-quadrant" data-quadrant="urgent-important">
+              <h3>Do First</h3>
+              <p class="quadrant-description">Urgent & Important</p>
+              <div class="projects-container" id="urgent-important-projects">
+                <!-- Projects will be loaded here -->
+              </div>
+            </div>
+            
+            <div class="eisenhower-quadrant" data-quadrant="not-urgent-important">
+              <h3>Schedule</h3>
+              <p class="quadrant-description">Not Urgent & Important</p>
+              <div class="projects-container" id="not-urgent-important-projects">
+                <!-- Projects will be loaded here -->
+              </div>
+            </div>
+            
+            <div class="eisenhower-quadrant" data-quadrant="urgent-not-important">
+              <h3>Delegate</h3>
+              <p class="quadrant-description">Urgent & Not Important</p>
+              <div class="projects-container" id="urgent-not-important-projects">
+                <!-- Projects will be loaded here -->
+              </div>
+            </div>
+            
+            <div class="eisenhower-quadrant" data-quadrant="not-urgent-not-important">
+              <h3>Eliminate</h3>
+              <p class="quadrant-description">Not Urgent & Not Important</p>
+              <div class="projects-container" id="not-urgent-not-important-projects">
+                <!-- Projects will be loaded here -->
+              </div>
+            </div>
           </div>
         </div>
 
-        <div class="grid">
-          <div class="quadrant" data-quadrant="do_first">
-            <h3 data-i18n="q_do_first_title">Do First</h3>
-            <p class="hint" data-i18n="q_do_first_hint">Crises, emergencies, deadlines</p>
-            <ul class="task-list" id="list-do_first"></ul>
+        <!-- Project Page -->
+        <div id="projectPage" hidden>
+          <div class="toolbar card">
+            <button id="backToProjects" class="btn secondary">← Back to Projects</button>
+            <h2 id="projectTitle">Project Name</h2>
+            <div class="project-actions">
+              <button id="editProjectBtn" class="btn">Edit Project</button>
+              <button id="deleteProjectBtn" class="btn danger">Delete Project</button>
+            </div>
           </div>
-          <div class="quadrant" data-quadrant="schedule">
-            <h3 data-i18n="q_schedule_title">Schedule</h3>
-            <p class="hint" data-i18n="q_schedule_hint">Planning, learning, relationships</p>
-            <ul class="task-list" id="list-schedule"></ul>
+
+          <div class="project-stats card">
+            <div class="stat">
+              <span class="stat-label">Total Tasks</span>
+              <span id="totalTasks" class="stat-value">0</span>
+            </div>
+            <div class="stat">
+              <span class="stat-label">Completed</span>
+              <span id="completedTasks" class="stat-value">0</span>
+            </div>
+            <div class="stat">
+              <span class="stat-label">Progress</span>
+              <div class="progress-bar">
+                <div id="progressFill" class="progress-fill"></div>
+                <span id="progressText" class="progress-text">0%</span>
+              </div>
+            </div>
           </div>
-          <div class="quadrant" data-quadrant="delegate">
-            <h3 data-i18n="q_delegate_title">Delegate</h3>
-            <p class="hint" data-i18n="q_delegate_hint">Interruptions, some meetings</p>
-            <ul class="task-list" id="list-delegate"></ul>
+
+          <div class="task-controls card">
+            <form id="newTaskForm">
+              <input id="newTaskTitle" placeholder="New task title" required>
+              <select id="newTaskPriority">
+                <option value="High">High Priority</option>
+                <option value="Medium" selected>Medium Priority</option>
+                <option value="Low">Low Priority</option>
+              </select>
+              <input id="newTaskDueDate" type="date">
+              <button type="submit" class="btn primary">Add Task</button>
+            </form>
+            
+            <div class="filters">
+              <select id="statusFilter">
+                <option value="">All Status</option>
+                <option value="To Do">To Do</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Done">Done</option>
+              </select>
+              <select id="priorityFilter">
+                <option value="">All Priority</option>
+                <option value="High">High</option>
+                <option value="Medium">Medium</option>
+                <option value="Low">Low</option>
+              </select>
+              <select id="sortBy">
+                <option value="priority">Sort by Priority</option>
+                <option value="status">Sort by Status</option>
+                <option value="due_date">Sort by Due Date</option>
+                <option value="created">Sort by Created</option>
+              </select>
+            </div>
           </div>
-          <div class="quadrant" data-quadrant="eliminate">
-            <h3 data-i18n="q_eliminate_title">Eliminate</h3>
-            <p class="hint" data-i18n="q_eliminate_hint">Distractions & time-wasters</p>
-            <ul class="task-list" id="list-eliminate"></ul>
+
+          <div id="tasksContainer">
+            <div class="kanban-board">
+              <div class="kanban-column" data-status="To Do">
+                <h3>To Do</h3>
+                <ul class="task-list" id="list-todo"></ul>
+              </div>
+              <div class="kanban-column" data-status="In Progress">
+                <h3>In Progress</h3>
+                <ul class="task-list" id="list-progress"></ul>
+              </div>
+              <div class="kanban-column" data-status="Done">
+                <h3>Done</h3>
+                <ul class="task-list" id="list-done"></ul>
+              </div>
+            </div>
           </div>
         </div>
       </section>
+
+      <!-- Project Creation Modal -->
+      <div id="projectModal" class="modal" hidden>
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3>Create New Project</h3>
+            <button id="closeProjectModal" class="btn icon">×</button>
+          </div>
+          <form id="projectForm">
+            <input id="projectFormTitle" placeholder="Project title" required>
+            <textarea id="projectFormDescription" placeholder="Project description (optional)" rows="3"></textarea>
+            <div class="modal-actions">
+              <button type="button" id="cancelProject" class="btn">Cancel</button>
+              <button type="submit" class="btn primary">Create Project</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Task Edit Modal -->
+      <div id="taskModal" class="modal" hidden>
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3>Edit Task</h3>
+            <button id="closeTaskModal" class="btn icon">×</button>
+          </div>
+          <form id="taskForm">
+            <input id="taskTitle" placeholder="Task title" required>
+            <textarea id="taskDescription" placeholder="Task description (optional)" rows="3"></textarea>
+            <div class="form-row">
+              <select id="taskPriority">
+                <option value="High">High Priority</option>
+                <option value="Medium">Medium Priority</option>
+                <option value="Low">Low Priority</option>
+              </select>
+              <select id="taskStatus">
+                <option value="To Do">To Do</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Done">Done</option>
+              </select>
+            </div>
+            <input id="taskDueDate" type="date">
+            <div class="modal-actions">
+              <button type="button" id="cancelTask" class="btn">Cancel</button>
+              <button type="submit" class="btn primary">Save Task</button>
+            </div>
+          </form>
+        </div>
+      </div>
     </main>
   </div>
 

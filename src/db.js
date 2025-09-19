@@ -34,8 +34,6 @@ const pool = mysql.createPool({
   connectionLimit: 10,
   multipleStatements: true,
   ssl: useSSL ? { rejectUnauthorized } : undefined,
-  acquireTimeout: 60000,
-  timeout: 60000,
 });
 
 async function runMigrations() {
@@ -47,23 +45,57 @@ async function runMigrations() {
       created_at DATETIME NOT NULL
     );
 
-    CREATE TABLE IF NOT EXISTS tasks (
+    CREATE TABLE IF NOT EXISTS projects (
       id VARCHAR(36) PRIMARY KEY,
       user_id VARCHAR(36) NOT NULL,
       title VARCHAR(255) NOT NULL,
       description TEXT,
-      quadrant ENUM('do_first','schedule','delegate','eliminate') NOT NULL,
+      quadrant ENUM('urgent-important','not-urgent-important','urgent-not-important','not-urgent-not-important') DEFAULT 'not-urgent-not-important',
+      created_at DATETIME NOT NULL,
+      updated_at DATETIME NOT NULL,
+      CONSTRAINT fk_projects_user FOREIGN KEY (user_id)
+        REFERENCES users(id)
+        ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS tasks (
+      id VARCHAR(36) PRIMARY KEY,
+      project_id VARCHAR(36) NOT NULL,
+      user_id VARCHAR(36) NOT NULL,
+      title VARCHAR(255) NOT NULL,
+      description TEXT,
+      priority ENUM('High','Medium','Low') NOT NULL DEFAULT 'Medium',
+      status ENUM('To Do','In Progress','Done') NOT NULL DEFAULT 'To Do',
+      due_date DATETIME NULL,
+      parent_task_id VARCHAR(36) NULL,
       completed TINYINT(1) NOT NULL DEFAULT 0,
       created_at DATETIME NOT NULL,
       updated_at DATETIME NOT NULL,
+      CONSTRAINT fk_tasks_project FOREIGN KEY (project_id)
+        REFERENCES projects(id)
+        ON DELETE CASCADE,
       CONSTRAINT fk_tasks_user FOREIGN KEY (user_id)
         REFERENCES users(id)
+        ON DELETE CASCADE,
+      CONSTRAINT fk_tasks_parent FOREIGN KEY (parent_task_id)
+        REFERENCES tasks(id)
         ON DELETE CASCADE
     );
   `;
 
   const createIndexSQL = `
-    CREATE INDEX idx_tasks_user_quadrant ON tasks(user_id, quadrant);
+    CREATE INDEX idx_projects_user ON projects(user_id);
+    CREATE INDEX idx_tasks_project ON tasks(project_id);
+    CREATE INDEX idx_tasks_user ON tasks(user_id);
+    CREATE INDEX idx_tasks_parent ON tasks(parent_task_id);
+    CREATE INDEX idx_tasks_status ON tasks(status);
+    CREATE INDEX idx_tasks_priority ON tasks(priority);
+  `;
+
+  const addQuadrantColumnSQL = `
+    ALTER TABLE projects 
+    ADD COLUMN quadrant ENUM('urgent-important','not-urgent-important','urgent-not-important','not-urgent-not-important') 
+    DEFAULT 'not-urgent-not-important';
   `;
 
   const conn = await pool.getConnection();
@@ -73,6 +105,12 @@ async function runMigrations() {
       await conn.query(createIndexSQL);
     } catch (e) {
       // Ignore if index already exists
+    }
+    try {
+      await conn.query(addQuadrantColumnSQL);
+    } catch (e) {
+      // Ignore if column already exists
+      console.log('Quadrant column already exists or could not be added:', e.message);
     }
   } finally {
     conn.release();

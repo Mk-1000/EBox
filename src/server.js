@@ -9,6 +9,7 @@ require('dotenv').config();
 require('./db');
 
 const authRoutes = require('./auth');
+const projectRoutes = require('./projects');
 const taskRoutes = require('./tasks');
 
 const app = express();
@@ -44,6 +45,7 @@ app.get('/api/health', async (req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/projects', projectRoutes);
 app.use('/api/tasks', taskRoutes);
 
 app.use(express.static(path.join(__dirname, '..', 'public')));
