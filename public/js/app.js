@@ -220,6 +220,17 @@ function renderProjects() {
     const container = $(`#${quadrant}-projects`);
     if (!container) return;
     
+    // Truncate description if too long (shorter for better layout)
+    const maxDescriptionLength = 60;
+    const description = project.description || 'No description';
+    const truncatedDescription = description.length > maxDescriptionLength 
+      ? description.substring(0, maxDescriptionLength) + '...' 
+      : description;
+    
+    // Ensure progress is a valid number and debug
+    const progress = Math.max(0, Math.min(100, project.progress || 0));
+    console.log(`Project ${project.title}: progress=${progress}%, total_tasks=${project.total_tasks}, completed_tasks=${project.completed_tasks}`);
+    
     const card = el('div', { 
       class: 'project-card', 
       draggable: true,
@@ -227,11 +238,11 @@ function renderProjects() {
       onclick: () => openProject(project.id)
     }, [
       el('h4', { text: project.title }),
-      el('p', { text: project.description || 'No description' }),
+      el('p', { text: truncatedDescription }),
       el('div', { class: 'project-progress' }, [
         el('div', { class: 'progress-bar' }, [
-          el('div', { class: 'progress-fill', style: `width: ${project.progress}%` }),
-          el('span', { class: 'progress-text', text: `${project.progress}%` })
+          el('div', { class: 'progress-fill', style: `width: ${progress}%` }),
+          el('span', { class: 'progress-text', text: `${progress}%` })
         ])
       ])
     ]);
@@ -278,8 +289,10 @@ async function openProject(projectId) {
 function updateProjectStats() {
   if (!currentProject) return;
   
-  const totalTasks = tasks.length;
-  const completedTasks = tasks.filter(t => t.status === 'Done').length;
+  // Only count parent tasks for progress calculation (exclude subtasks)
+  const parentTasks = tasks.filter(task => !task.parent_task_id);
+  const totalTasks = parentTasks.length;
+  const completedTasks = parentTasks.filter(t => t.status === 'Done').length;
   const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
   
   $('#totalTasks').textContent = totalTasks;
@@ -301,6 +314,7 @@ function renderTasks() {
   const statusFilter = $('#statusFilter')?.value || '';
   const priorityFilter = $('#priorityFilter')?.value || '';
   
+  // Only show parent tasks in the Kanban board
   let filteredTasks = tasks.filter(task => {
     if (statusFilter && task.status !== statusFilter) return false;
     if (priorityFilter && task.priority !== priorityFilter) return false;
@@ -351,11 +365,16 @@ function createTaskElement(task) {
       el('span', { text: `Created ${new Date(task.created_at).toLocaleDateString()}` })
     ].filter(Boolean)),
     task.description ? el('div', { class: 'task-description', text: task.description }) : null,
+    // Display subtasks as nested items
     task.subtasks && task.subtasks.length > 0 ? el('div', { class: 'task-subtasks' }, 
       task.subtasks.map(subtask => 
         el('div', { class: `subtask ${subtask.completed ? 'completed' : ''}` }, [
           el('input', { type: 'checkbox', checked: subtask.completed, onchange: () => toggleSubtask(subtask.id) }),
-          el('span', { text: subtask.title })
+          el('span', { text: subtask.title }),
+          el('div', { class: 'subtask-actions' }, [
+            el('button', { class: 'btn small', text: 'Edit', onclick: () => editTask(subtask) }),
+            el('button', { class: 'btn small danger', text: 'Delete', onclick: () => deleteTask(subtask.id) })
+          ])
         ])
       )
     ) : null,
@@ -384,7 +403,20 @@ async function createTask(projectId, taskData) {
       })
     });
     
-    tasks.push(task);
+    // If this is a subtask, add it to the parent task's subtasks array
+    if (taskData.parentTaskId) {
+      const parentTask = tasks.find(t => t.id === taskData.parentTaskId);
+      if (parentTask) {
+        if (!parentTask.subtasks) {
+          parentTask.subtasks = [];
+        }
+        parentTask.subtasks.push(task);
+      }
+    } else {
+      // If it's a parent task, add it to the main tasks array
+      tasks.push(task);
+    }
+    
     updateProjectStats();
     renderTasks();
   } catch (err) {
@@ -437,6 +469,24 @@ async function toggleTaskStatus(taskId, status) {
     const index = tasks.findIndex(t => t.id === taskId);
     if (index !== -1) {
       tasks[index] = task;
+      
+      // If the parent task is marked as "Done", mark all subtasks as completed
+      if (status === 'Done' && tasks[index].subtasks && tasks[index].subtasks.length > 0) {
+        // Mark all subtasks as completed
+        for (let subtask of tasks[index].subtasks) {
+          if (!subtask.completed) {
+            try {
+              await api(`/api/tasks/${subtask.id}/toggle`, {
+                method: 'POST',
+                body: JSON.stringify({ completed: true })
+              });
+              subtask.completed = true;
+            } catch (err) {
+              console.error('Failed to mark subtask as completed:', err);
+            }
+          }
+        }
+      }
     }
     
     updateProjectStats();
@@ -476,28 +526,47 @@ function addSubtask(parentTaskId) {
 }
 
 async function toggleSubtask(subtaskId) {
-  // Find subtask in tasks array
-  for (let task of tasks) {
-    if (task.subtasks) {
-      const subtask = task.subtasks.find(st => st.id === subtaskId);
-      if (subtask) {
-        try {
-          const { task: updatedTask } = await api(`/api/tasks/${subtaskId}/toggle`, {
-            method: 'POST',
-            body: JSON.stringify({ completed: !subtask.completed })
-          });
-          
-          // Update the subtask
-          Object.assign(subtask, updatedTask);
-          updateProjectStats();
-          renderTasks();
-          return;
-        } catch (err) {
-          console.error('Failed to toggle subtask:', err);
-          alert('Failed to toggle subtask: ' + err.message);
+  try {
+    // Find the subtask in the tasks array
+    let subtask = null;
+    let parentTask = null;
+    
+    for (let task of tasks) {
+      if (task.subtasks) {
+        const foundSubtask = task.subtasks.find(st => st.id === subtaskId);
+        if (foundSubtask) {
+          subtask = foundSubtask;
+          parentTask = task;
+          break;
         }
       }
     }
+    
+    if (!subtask) {
+      console.error('Subtask not found');
+      return;
+    }
+    
+    const { task: updatedSubtask } = await api(`/api/tasks/${subtaskId}/toggle`, {
+      method: 'POST',
+      body: JSON.stringify({ completed: !subtask.completed })
+    });
+    
+    // Update the subtask
+    Object.assign(subtask, updatedSubtask);
+    
+    // Check if all subtasks are completed and update parent task if needed
+    const allSubtasksCompleted = parentTask.subtasks.every(st => st.completed);
+    if (allSubtasksCompleted && parentTask.subtasks.length > 0) {
+      // Update parent task status to Done
+      await toggleTaskStatus(parentTask.id, 'Done');
+    }
+    
+    updateProjectStats();
+    renderTasks();
+  } catch (err) {
+    console.error('Failed to toggle subtask:', err);
+    alert('Failed to toggle subtask: ' + err.message);
   }
 }
 

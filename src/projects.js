@@ -17,9 +17,9 @@ router.get('/', async (req, res) => {
     const [rows] = await pool.query(
       `SELECT p.*, 
        COUNT(t.id) as total_tasks,
-       COUNT(CASE WHEN t.completed = 1 THEN 1 END) as completed_tasks
+       COUNT(CASE WHEN t.status = 'Done' THEN 1 END) as completed_tasks
        FROM projects p
-       LEFT JOIN tasks t ON p.id = t.project_id
+       LEFT JOIN tasks t ON p.id = t.project_id AND t.parent_task_id IS NULL
        WHERE p.user_id = ?
        GROUP BY p.id
        ORDER BY p.updated_at DESC`,

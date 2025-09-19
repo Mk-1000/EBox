@@ -52,15 +52,15 @@ body[data-theme=light] .eisenhower-quadrant{border-color:#e5e7eb}
 .quadrant-description{margin:0 0 16px 0;font-size:14px;color:var(--sub)}
 .projects-container{flex:1;overflow-y:auto;min-height:200px}
 .projects-container:empty::after{content:"Drop projects here";color:var(--sub);font-style:italic;display:block;text-align:center;padding:20px}
-.project-card{background:rgba(43,212,194,.1);border:1px solid rgba(43,212,194,.3);border-radius:8px;padding:12px;margin-bottom:8px;transition:transform .08s ease,box-shadow .12s ease,border-color .12s ease;cursor:pointer;position:relative}
+.project-card{background:rgba(43,212,194,.1);border:1px solid rgba(43,212,194,.3);border-radius:8px;padding:12px;margin-bottom:8px;transition:transform .08s ease,box-shadow .12s ease,border-color .12s ease;cursor:pointer;position:relative;min-height:140px;display:flex;flex-direction:column;max-width:100%}
 .project-card:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(43,212,194,.2)}
 .project-card.dragging{opacity:0.5;transform:rotate(5deg)}
-.project-card h4{margin:0 0 4px 0;font-size:14px;color:var(--text)}
-.project-card p{margin:0;font-size:12px;color:var(--sub)}
-.project-progress{margin-top:8px}
-.progress-bar{background:rgba(255,255,255,.1);border-radius:4px;height:6px;overflow:hidden;position:relative}
-.progress-fill{background:var(--accent);height:100%;transition:width .3s ease}
-.progress-text{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:10px;color:var(--text);font-weight:600}
+.project-card h4{margin:0 0 4px 0;font-size:14px;color:var(--text);line-height:1.3}
+.project-card p{margin:0;font-size:12px;color:var(--sub);line-height:1.4;flex:1;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;line-clamp:3;-webkit-box-orient:vertical}
+.project-progress{margin-top:auto;padding-top:8px}
+.progress-bar{background:rgba(255,255,255,.1);border-radius:6px;height:12px;overflow:hidden;position:relative;width:100%}
+.progress-fill{background:linear-gradient(90deg,var(--accent),var(--green));height:100%;transition:width .3s ease;border-radius:6px}
+.progress-text{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:11px;color:var(--text);font-weight:600;text-shadow:0 1px 2px rgba(0,0,0,0.3)}
 .eisenhower-quadrant[data-quadrant="urgent-important"]{border-left:4px solid var(--red)}
 .eisenhower-quadrant[data-quadrant="not-urgent-important"]{border-left:4px solid var(--green)}
 .eisenhower-quadrant[data-quadrant="urgent-not-important"]{border-left:4px solid var(--yellow)}
@@ -155,6 +155,12 @@ body[data-theme=light] .modal-header{border-bottom-color:#e5e7eb}
   .task-controls form{flex-direction:column;align-items:stretch}
   .filters{flex-direction:column}
   .modal-content{min-width:300px;margin:16px}
+  .eisenhower-grid{grid-template-columns:1fr;gap:12px;height:auto}
+  .project-card{min-height:120px;padding:10px}
+  .project-card h4{font-size:13px}
+  .project-card p{font-size:11px;-webkit-line-clamp:2;line-clamp:2}
+  .progress-bar{height:10px}
+  .progress-text{font-size:10px}
 }
 @media (max-width:760px){.grid{grid-template-columns:1fr}}
 @media (max-width:760px){
@@ -171,6 +177,76 @@ body[data-theme=light] .modal-header{border-bottom-color:#e5e7eb}
   .toolbar #newTaskForm input{order:1;flex:1 1 100%;min-width:0}
   .toolbar #newTaskForm select{order:2;flex:1 1 60%}
   .toolbar #newTaskForm .btn{order:3}
+}
+
+/* Subtask styling for separate display */
+.task.subtask {
+  margin-left: 20px;
+  border-left: 3px solid var(--accent);
+  background: rgba(43, 212, 194, 0.05);
+  position: relative;
+}
+
+.task.subtask::before {
+  content: '';
+  position: absolute;
+  left: -3px;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--accent);
+  opacity: 0.6;
+}
+
+.subtask-indicator {
+  color: var(--accent);
+  font-weight: bold;
+  margin-right: 4px;
+}
+
+.parent-task-info {
+  color: var(--sub);
+  font-size: 0.9em;
+  font-style: italic;
+}
+
+.task.subtask .task-title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.subtask-actions {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.subtask-actions .btn {
+  padding: 2px 6px;
+  font-size: 10px;
+}
+
+.subtask {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(43, 212, 194, 0.1);
+}
+
+.subtask:last-child {
+  border-bottom: none;
+}
+
+.subtask input[type=checkbox] {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.subtask span {
+  flex: 1;
+  font-size: 13px;
 }
 
 

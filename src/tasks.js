@@ -17,13 +17,14 @@ router.get('/project/:projectId', async (req, res) => {
     const { projectId } = req.params;
     const { status, priority, sortBy = 'priority' } = req.query;
     
+    // Get all tasks (both parent tasks and subtasks) for the project
     let query = `
       SELECT t.*, 
        COUNT(st.id) as subtask_count,
        COUNT(CASE WHEN st.completed = 1 THEN 1 END) as completed_subtasks
        FROM tasks t
        LEFT JOIN tasks st ON t.id = st.parent_task_id
-       WHERE t.project_id = ? AND t.parent_task_id IS NULL
+       WHERE t.project_id = ?
     `;
     
     const params = [projectId];
@@ -57,20 +58,24 @@ router.get('/project/:projectId', async (req, res) => {
     
     const [rows] = await pool.query(query, params);
     
-    // Get subtasks for each task
-    const tasksWithSubtasks = await Promise.all(
-      rows.map(async (task) => {
-        const [subtaskRows] = await pool.query(
-          'SELECT * FROM tasks WHERE parent_task_id = ? ORDER BY created_at ASC',
-          [task.id]
-        );
-        
-        return {
-          ...task,
-          subtasks: subtaskRows
-        };
-      })
-    );
+    // Separate parent tasks and subtasks
+    const parentTasks = rows.filter(task => !task.parent_task_id);
+    const subtasks = rows.filter(task => task.parent_task_id);
+    
+    // Group subtasks by parent task ID
+    const subtasksByParent = {};
+    subtasks.forEach(subtask => {
+      if (!subtasksByParent[subtask.parent_task_id]) {
+        subtasksByParent[subtask.parent_task_id] = [];
+      }
+      subtasksByParent[subtask.parent_task_id].push(subtask);
+    });
+    
+    // Add subtasks to their parent tasks
+    const tasksWithSubtasks = parentTasks.map(task => ({
+      ...task,
+      subtasks: subtasksByParent[task.id] || []
+    }));
     
     res.json({ tasks: tasksWithSubtasks });
   } catch (err) {
@@ -195,6 +200,31 @@ router.post('/:id/toggle', async (req, res) => {
     
     if (result.affectedRows === 0) return res.status(404).json({ error: 'Task not found' });
     
+    // If this is a subtask, check if all subtasks of the parent are completed
+    const [parentRows] = await pool.query(
+      'SELECT parent_task_id FROM tasks WHERE id = ?', [id]
+    );
+    
+    if (parentRows.length > 0 && parentRows[0].parent_task_id) {
+      const parentTaskId = parentRows[0].parent_task_id;
+      
+      // Check if all subtasks of the parent are completed
+      const [subtaskRows] = await pool.query(
+        'SELECT COUNT(*) as total, COUNT(CASE WHEN completed = 1 THEN 1 END) as completed FROM tasks WHERE parent_task_id = ?',
+        [parentTaskId]
+      );
+      
+      const { total, completed: completedCount } = subtaskRows[0];
+      
+      // If all subtasks are completed, mark parent as completed
+      if (total > 0 && completedCount === total) {
+        await pool.query(
+          'UPDATE tasks SET completed = 1, status = "Done", updated_at = ? WHERE id = ? AND user_id = ?',
+          [now, parentTaskId, req.session.user.id]
+        );
+      }
+    }
+    
     const [rows] = await pool.query('SELECT * FROM tasks WHERE id = ? AND user_id = ?', [id, req.session.user.id]);
     res.json({ task: rows[0] });
   } catch (err) {
@@ -219,6 +249,14 @@ router.post('/:id/status', async (req, res) => {
     );
     
     if (result.affectedRows === 0) return res.status(404).json({ error: 'Task not found' });
+    
+    // If the task is marked as "Done", mark all its subtasks as completed
+    if (status === 'Done') {
+      await pool.query(
+        'UPDATE tasks SET completed = 1, status = ?, updated_at = ? WHERE parent_task_id = ? AND user_id = ?',
+        ['Done', now, id, req.session.user.id]
+      );
+    }
     
     const [rows] = await pool.query('SELECT * FROM tasks WHERE id = ? AND user_id = ?', [id, req.session.user.id]);
     res.json({ task: rows[0] });
