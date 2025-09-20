@@ -45,21 +45,21 @@ class TaskService {
     const tasks = await this.taskRepository.findWithFilters(projectId, filters);
     
     // Separate parent tasks and subtasks
-    const parentTasks = tasks.filter(task => !task.parent_task_id);
-    const subtasks = tasks.filter(task => task.parent_task_id);
+    const parentTasks = tasks.filter(task => !task.parentTaskId);
+    const subtasks = tasks.filter(task => task.parentTaskId);
     
     // Group subtasks by parent task ID
     const subtasksByParent = {};
     subtasks.forEach(subtask => {
-      if (!subtasksByParent[subtask.parent_task_id]) {
-        subtasksByParent[subtask.parent_task_id] = [];
+      if (!subtasksByParent[subtask.parentTaskId]) {
+        subtasksByParent[subtask.parentTaskId] = [];
       }
-      subtasksByParent[subtask.parent_task_id].push(subtask);
+      subtasksByParent[subtask.parentTaskId].push(subtask.toJSON());
     });
     
     // Add subtasks to their parent tasks
     const tasksWithSubtasks = parentTasks.map(task => ({
-      ...task,
+      ...task.toJSON(),
       subtasks: subtasksByParent[task.id] || []
     }));
     

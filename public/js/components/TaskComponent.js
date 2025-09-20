@@ -98,7 +98,7 @@ export class TaskComponent {
     });
 
     // Filter out subtasks - only render parent tasks
-    const parentTasks = tasks.filter(task => !task.parent_task_id);
+    const parentTasks = tasks.filter(task => !task.parentTaskId);
     console.log('Parent tasks to render:', parentTasks);
 
     // Render each parent task with its subtasks
@@ -122,7 +122,7 @@ export class TaskComponent {
   createTaskElement(task, subtasks = []) {
     console.log('Creating task element for:', task.title, 'dueDate:', task.dueDate);
     
-    const isSubtask = task.parent_task_id !== null;
+    const isSubtask = task.parentTaskId !== null;
     const children = [
       el('div', { className: 'task-header' }, [
         el('div', { className: 'task-main' }, [
@@ -132,10 +132,6 @@ export class TaskComponent {
               textContent: task.title 
             }),
             el('div', { className: 'task-meta-inline' }, [
-              task.dueDate ? el('span', { 
-                className: 'due-date-inline',
-                textContent: this.formatDueDate(task.dueDate)
-              }) : null,
               el('span', { 
                 className: `priority-dot priority-${task.priority.toLowerCase()}`,
                 title: task.priority
@@ -148,7 +144,8 @@ export class TaskComponent {
             console.log('Remaining time result:', remainingTime);
             return remainingTime ? el('div', { 
               className: `remaining-time ${remainingTime.urgent ? 'urgent' : ''}`,
-              textContent: remainingTime.text
+              textContent: remainingTime.text,
+              title: `Due: ${this.formatDueDate(task.dueDate)}`
             }) : null;
           })() : null,
           task.description ? el('p', { 
@@ -184,11 +181,11 @@ export class TaskComponent {
       ])
     ];
 
-    // Add subtasks section for parent tasks
-    if (!isSubtask) {
+    // Add subtasks section for parent tasks only if they have subtasks
+    if (!isSubtask && subtasks.length > 0) {
       // Calculate subtask completion stats
       const completedSubtasks = subtasks.filter(subtask => subtask.completed).length;
-      const subtaskProgress = subtasks.length > 0 ? Math.round((completedSubtasks / subtasks.length) * 100) : 0;
+      const subtaskProgress = Math.round((completedSubtasks / subtasks.length) * 100);
       
       const subtaskElements = subtasks.map(subtask => {
         const checkbox = el('input', {
@@ -208,10 +205,6 @@ export class TaskComponent {
             title: subtask.title // Show full title on hover
           }),
           el('div', { className: 'subtask-meta' }, [
-            subtask.dueDate ? el('span', { 
-              className: 'subtask-due-date',
-              textContent: this.formatDueDate(subtask.dueDate)
-            }) : null,
             el('span', { 
               className: `priority-dot priority-${subtask.priority.toLowerCase()}`,
               title: subtask.priority
@@ -221,7 +214,8 @@ export class TaskComponent {
             const remainingTime = this.formatRemainingTime(subtask.dueDate);
             return remainingTime ? el('div', { 
               className: `subtask-remaining-time ${remainingTime.urgent ? 'urgent' : ''}`,
-              textContent: remainingTime.text
+              textContent: remainingTime.text,
+              title: `Due: ${this.formatDueDate(subtask.dueDate)}`
             }) : null;
           })() : null,
           el('div', { className: 'subtask-actions' }, [
@@ -263,12 +257,12 @@ export class TaskComponent {
         el('div', { className: 'subtasks-header' }, [
           el('div', { className: 'subtasks-info' }, [
             el('span', { className: 'subtasks-count', textContent: `${completedSubtasks}/${subtasks.length} completed` }),
-            subtasks.length > 0 ? el('div', { className: 'subtask-progress-bar' }, [
+            el('div', { className: 'subtask-progress-bar' }, [
               el('div', { 
                 className: 'subtask-progress-fill',
                 style: `width: ${subtaskProgress}%`
               })
-            ]) : null
+            ])
           ]),
           el('button', {
             className: 'btn-icon small',
@@ -278,7 +272,7 @@ export class TaskComponent {
             el('span', { className: 'icon-text', textContent: '+' })
           ])
         ]),
-        subtasks.length > 0 ? el('div', { className: 'subtasks-list' }, subtaskElements) : el('div', { className: 'subtasks-list empty', textContent: 'No subtasks yet - click + to add one' })
+        el('div', { className: 'subtasks-list' }, subtaskElements)
       ]);
       
       children.push(subtasksSection);
@@ -287,7 +281,7 @@ export class TaskComponent {
     const taskEl = el('li', {
       className: 'task-item',
       'data-task-id': task.id,
-      'data-parent-id': task.parent_task_id,
+      'data-parent-id': task.parentTaskId,
       draggable: 'true'
     }, children);
 
@@ -884,6 +878,13 @@ export class TaskComponent {
     
     const date = new Date(dueDate);
     const now = new Date();
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      console.log('Invalid date provided:', dueDate);
+      return null;
+    }
+    
     const diffTime = date - now;
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     const diffHours = Math.ceil(diffTime / (1000 * 60 * 60));

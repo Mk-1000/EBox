@@ -146,8 +146,24 @@ class TaskRepository extends ITaskRepository {
     
     const [allTasks] = await databaseConnection.query(query, params);
     
+    // Convert raw database rows to Task entities
+    const taskEntities = allTasks.map(taskData => new Task(
+      taskData.id,
+      taskData.project_id,
+      taskData.user_id,
+      taskData.title,
+      taskData.description,
+      taskData.priority,
+      taskData.status,
+      taskData.due_date,
+      taskData.parent_task_id,
+      taskData.completed,
+      taskData.created_at,
+      taskData.updated_at
+    ));
+    
     // Apply filters to parent tasks only (subtasks inherit their parent's filtering)
-    let filteredTasks = allTasks;
+    let filteredTasks = taskEntities;
     
     if (filters.status) {
       filteredTasks = filteredTasks.filter(task => task.status === filters.status);
@@ -158,8 +174,8 @@ class TaskRepository extends ITaskRepository {
     }
     
     // Separate parent tasks and subtasks
-    const parentTasks = filteredTasks.filter(task => !task.parent_task_id);
-    const subtasks = allTasks.filter(task => task.parent_task_id);
+    const parentTasks = filteredTasks.filter(task => !task.parentTaskId);
+    const subtasks = taskEntities.filter(task => task.parentTaskId);
     
     // Add sorting to parent tasks
     switch (filters.sortBy) {
@@ -169,7 +185,7 @@ class TaskRepository extends ITaskRepository {
           const aPriority = priorityOrder[a.priority] || 4;
           const bPriority = priorityOrder[b.priority] || 4;
           if (aPriority !== bPriority) return aPriority - bPriority;
-          return new Date(a.created_at) - new Date(b.created_at);
+          return new Date(a.createdAt) - new Date(b.createdAt);
         });
         break;
       case 'status':
@@ -178,19 +194,19 @@ class TaskRepository extends ITaskRepository {
           const aStatus = statusOrder[a.status] || 4;
           const bStatus = statusOrder[b.status] || 4;
           if (aStatus !== bStatus) return aStatus - bStatus;
-          return new Date(a.created_at) - new Date(b.created_at);
+          return new Date(a.createdAt) - new Date(b.createdAt);
         });
         break;
       case 'due_date':
         parentTasks.sort((a, b) => {
-          if (!a.due_date && !b.due_date) return new Date(a.created_at) - new Date(b.created_at);
-          if (!a.due_date) return 1;
-          if (!b.due_date) return -1;
-          return new Date(a.due_date) - new Date(b.due_date);
+          if (!a.dueDate && !b.dueDate) return new Date(a.createdAt) - new Date(b.createdAt);
+          if (!a.dueDate) return 1;
+          if (!b.dueDate) return -1;
+          return new Date(a.dueDate) - new Date(b.dueDate);
         });
         break;
       default:
-        parentTasks.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        parentTasks.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     }
     
     // Return all tasks (parent tasks and subtasks) so the service can group them properly
