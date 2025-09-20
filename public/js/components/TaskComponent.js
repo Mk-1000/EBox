@@ -40,6 +40,9 @@ export class TaskComponent {
     $('#priorityFilter').addEventListener('change', () => this.loadTasks());
     $('#sortBy').addEventListener('change', () => this.loadTasks());
     
+    // Setup drag and drop for kanban columns (only once)
+    this.setupKanbanDropZones();
+    
     // Listen for events
     eventBus.on(EVENTS.PROJECT_SELECTED, () => this.loadTasks());
     eventBus.on(EVENTS.TASK_CREATED, () => this.loadTasks());
@@ -128,7 +131,14 @@ export class TaskComponent {
       const taskElement = this.createTaskElement(task, taskSubtasks);
       const column = columns[task.status];
       if (column) {
-        column.appendChild(taskElement);
+        // Find the task list within the column and insert at the top
+        const taskList = column.querySelector('.task-list');
+        if (taskList) {
+          taskList.insertBefore(taskElement, taskList.firstChild);
+        } else {
+          // Fallback to appendChild if task list not found
+          column.appendChild(taskElement);
+        }
       }
     });
   }
@@ -522,13 +532,87 @@ export class TaskComponent {
     this.currentEditingTask = null;
   }
 
-  setupTaskDragAndDrop(taskEl, task) {
+  setupKanbanDropZones() {
     let draggedTask = null;
-    let dragOverColumn = null;
 
-    // Drag start
+    // Setup drop zones (kanban columns) - only once
+    $$('.kanban-column').forEach(column => {
+      column.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        
+        // Remove previous dragover
+        $$('.kanban-column').forEach(col => col.classList.remove('dragover'));
+        
+        // Add dragover to current column
+        column.classList.add('dragover');
+        
+        // Add visual feedback
+        column.style.backgroundColor = 'rgba(0, 123, 255, 0.1)';
+        column.style.border = '2px dashed #007bff';
+      });
+
+      column.addEventListener('dragleave', (e) => {
+        // Only remove if we're actually leaving the column
+        // Check if relatedTarget exists and is not contained within the column
+        if (!e.relatedTarget || !column.contains(e.relatedTarget)) {
+          column.classList.remove('dragover');
+          column.style.backgroundColor = '';
+          column.style.border = '';
+        }
+      });
+
+      column.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        column.classList.remove('dragover');
+        column.style.backgroundColor = '';
+        column.style.border = '';
+        
+        if (this.draggedTask) {
+          const newStatus = column.getAttribute('data-status');
+          if (newStatus && newStatus !== this.draggedTask.status) {
+            // Optimistic update - immediate UI feedback
+            this.updateTaskStatusOptimistic(this.draggedTask.id, newStatus);
+          }
+        }
+      });
+    });
+
+    // Store reference to draggedTask for use in drop handlers
+    this.draggedTask = null;
+    
+    // Global drag start handler
+    document.addEventListener('dragstart', (e) => {
+      if (e.target.classList.contains('task-item')) {
+        const taskId = e.target.getAttribute('data-task-id');
+        if (taskId) {
+          // Find the task data from current state
+          const currentState = stateManager.getState();
+          const task = currentState.tasks.find(t => t.id == taskId);
+          if (task) {
+            this.draggedTask = task;
+          }
+        }
+      }
+    });
+
+    // Global drag end handler
+    document.addEventListener('dragend', (e) => {
+      if (e.target.classList.contains('task-item')) {
+        // Remove dragover class from all columns
+        $$('.kanban-column').forEach(column => {
+          column.classList.remove('dragover');
+          column.style.backgroundColor = '';
+          column.style.border = '';
+        });
+        this.draggedTask = null;
+      }
+    });
+  }
+
+  setupTaskDragAndDrop(taskEl, task) {
+    // Only setup drag start for individual tasks
     taskEl.addEventListener('dragstart', (e) => {
-      draggedTask = task;
       taskEl.classList.add('dragging');
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/html', taskEl.outerHTML);
@@ -546,61 +630,10 @@ export class TaskComponent {
       setTimeout(() => document.body.removeChild(dragImage), 0);
     });
 
-    // Drag end
     taskEl.addEventListener('dragend', (e) => {
       taskEl.classList.remove('dragging');
       taskEl.style.opacity = '';
       taskEl.style.transform = '';
-      draggedTask = null;
-      dragOverColumn = null;
-      
-      // Remove dragover class from all columns
-      $$('.kanban-column').forEach(column => {
-        column.classList.remove('dragover');
-      });
-    });
-
-    // Setup drop zones (kanban columns)
-    $$('.kanban-column').forEach(column => {
-      column.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        
-        // Remove previous dragover
-        $$('.kanban-column').forEach(col => col.classList.remove('dragover'));
-        
-        // Add dragover to current column
-        column.classList.add('dragover');
-        dragOverColumn = column;
-        
-        // Add visual feedback
-        column.style.backgroundColor = 'rgba(0, 123, 255, 0.1)';
-        column.style.border = '2px dashed #007bff';
-      });
-
-      column.addEventListener('dragleave', (e) => {
-        // Only remove if we're actually leaving the column
-        if (!column.contains(e.relatedTarget)) {
-          column.classList.remove('dragover');
-          column.style.backgroundColor = '';
-          column.style.border = '';
-        }
-      });
-
-      column.addEventListener('drop', async (e) => {
-        e.preventDefault();
-        column.classList.remove('dragover');
-        column.style.backgroundColor = '';
-        column.style.border = '';
-        
-        if (draggedTask) {
-          const newStatus = column.getAttribute('data-status');
-          if (newStatus && newStatus !== task.status) {
-            // Optimistic update - immediate UI feedback
-            this.updateTaskStatusOptimistic(task.id, newStatus);
-          }
-        }
-      });
     });
   }
 
@@ -644,13 +677,17 @@ export class TaskComponent {
     const targetColumn = document.querySelector(`[data-status="${newStatus}"]`);
     if (!targetColumn) return;
 
+    // Find the task list within the target column
+    const taskList = targetColumn.querySelector('.task-list');
+    if (!taskList) return;
+
     // Remove from current position
     taskElement.remove();
     
-    // Add to new position with animation
+    // Add to new position with animation - insert at the top of the task list
     taskElement.style.opacity = '0';
     taskElement.style.transform = 'scale(0.8)';
-    targetColumn.appendChild(taskElement);
+    taskList.insertBefore(taskElement, taskList.firstChild);
     
     // Animate in
     requestAnimationFrame(() => {
