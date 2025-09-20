@@ -108,12 +108,22 @@ export class ThemeComponent {
   }
 
   toggleMenu() {
-    const isOpen = this.menuDropdown.getAttribute('aria-hidden') === 'false';
-    this.menuDropdown.setAttribute('aria-hidden', isOpen);
-    this.menuToggle.setAttribute('aria-expanded', !isOpen);
+    const isOpen = this.menuDropdown.classList.contains('open');
+    if (isOpen) {
+      this.closeMenu();
+    } else {
+      this.openMenu();
+    }
+  }
+
+  openMenu() {
+    this.menuDropdown.classList.add('open');
+    this.menuDropdown.setAttribute('aria-hidden', 'false');
+    this.menuToggle.setAttribute('aria-expanded', 'true');
   }
 
   closeMenu() {
+    this.menuDropdown.classList.remove('open');
     this.menuDropdown.setAttribute('aria-hidden', 'true');
     this.menuToggle.setAttribute('aria-expanded', 'false');
   }

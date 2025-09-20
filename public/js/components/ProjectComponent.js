@@ -15,6 +15,7 @@ export class ProjectComponent {
     this.backToProjectsBtn = $('#backToProjects');
     this.projectModal = $('#projectModal');
     this.projectForm = $('#projectForm');
+    this.currentEditingProject = null;
     
     this.initialize();
   }
@@ -32,6 +33,10 @@ export class ProjectComponent {
     this.backToProjectsBtn.addEventListener('click', () => this.showProjectsDashboard());
     this.projectForm.addEventListener('submit', (e) => this.handleCreateProject(e));
     
+    // Project action buttons
+    $('#editProjectBtn').addEventListener('click', () => this.editProject());
+    $('#deleteProjectBtn').addEventListener('click', () => this.deleteProject());
+    
     // Modal controls
     $('#closeProjectModal').addEventListener('click', () => this.hideProjectModal());
     $('#cancelProject').addEventListener('click', () => this.hideProjectModal());
@@ -39,6 +44,7 @@ export class ProjectComponent {
     // Listen for events
     eventBus.on(EVENTS.PROJECT_CREATED, () => this.loadProjects());
     eventBus.on(EVENTS.PROJECT_DELETED, () => this.loadProjects());
+    eventBus.on(EVENTS.PROJECT_UPDATED, () => this.loadProjects());
     
     // Listen for task changes to update progress bars dynamically
     eventBus.on(EVENTS.TASK_CREATED, () => this.updateAllProgressBars());
@@ -122,10 +128,10 @@ export class ProjectComponent {
           })
         ])
       ]),
-      el('p', { 
+      project.description ? el('p', { 
         className: 'project-description',
-        textContent: this.truncateDescription(project.description || 'No description')
-      }),
+        textContent: this.truncateDescription(project.description)
+      }) : null,
       el('div', { className: 'project-progress' }, [
         el('div', { className: 'progress-bar' }, [
           el('div', { 
@@ -198,6 +204,54 @@ export class ProjectComponent {
   hideProjectModal() {
     this.projectModal.hidden = true;
     this.projectForm.reset();
+    this.currentEditingProject = null;
+    
+    // Reset modal title and button text
+    $('#projectModal h3').textContent = 'Create New Project';
+    $('#projectForm button[type="submit"]').textContent = 'Create Project';
+  }
+
+  editProject() {
+    const currentProject = stateManager.getState().currentProject;
+    if (!currentProject) return;
+
+    // Populate the form with current project data
+    $('#projectFormTitle').value = currentProject.title;
+    $('#projectFormDescription').value = currentProject.description || '';
+    $('#projectFormQuadrant').value = currentProject.quadrant || '';
+    
+    // Update modal title and button text
+    $('#projectModal h3').textContent = 'Edit Project';
+    $('#projectForm button[type="submit"]').textContent = 'Update Project';
+    
+    // Store the current project ID for updating
+    this.currentEditingProject = currentProject;
+    
+    this.showProjectModal();
+  }
+
+  async deleteProject() {
+    const currentProject = stateManager.getState().currentProject;
+    if (!currentProject) return;
+
+    if (!confirm(`Are you sure you want to delete "${currentProject.title}"? This will also delete all associated tasks.`)) {
+      return;
+    }
+
+    try {
+      stateManager.setLoading(true);
+      await apiService.deleteProject(currentProject.id);
+      
+      // Go back to projects dashboard
+      this.showProjectsDashboard();
+      
+      eventBus.emit(EVENTS.PROJECT_DELETED, currentProject.id);
+    } catch (error) {
+      console.error('Failed to delete project:', error);
+      eventBus.emit(EVENTS.ERROR_OCCURRED, error);
+    } finally {
+      stateManager.setLoading(false);
+    }
   }
 
   async handleCreateProject(e) {
@@ -205,21 +259,46 @@ export class ProjectComponent {
     
     const title = $('#projectFormTitle').value.trim();
     const description = $('#projectFormDescription').value.trim();
-    const quadrant = 'not-urgent-not-important'; // Default quadrant
+    const quadrant = $('#projectFormQuadrant').value;
     
     if (!title) {
       alert('Project title is required');
       return;
     }
 
+    if (!quadrant) {
+      alert('Please select a priority quadrant');
+      return;
+    }
+
     try {
       stateManager.setLoading(true);
-      const response = await apiService.createProject(title, description, quadrant);
       
-      this.hideProjectModal();
-      eventBus.emit(EVENTS.PROJECT_CREATED, response.project);
+      if (this.currentEditingProject) {
+        // Update existing project
+        const response = await apiService.updateProject(this.currentEditingProject.id, {
+          title,
+          description,
+          quadrant
+        });
+        
+        this.hideProjectModal();
+        this.currentEditingProject = null;
+        
+        // Reset modal title and button text
+        $('#projectModal h3').textContent = 'Create New Project';
+        $('#projectForm button[type="submit"]').textContent = 'Create Project';
+        
+        eventBus.emit(EVENTS.PROJECT_UPDATED, response.project);
+      } else {
+        // Create new project
+        const response = await apiService.createProject(title, description, quadrant);
+        
+        this.hideProjectModal();
+        eventBus.emit(EVENTS.PROJECT_CREATED, response.project);
+      }
     } catch (error) {
-      console.error('Failed to create project:', error);
+      console.error('Failed to save project:', error);
       eventBus.emit(EVENTS.ERROR_OCCURRED, error);
     } finally {
       stateManager.setLoading(false);

@@ -181,6 +181,13 @@
           <form id="projectForm">
             <input id="projectFormTitle" placeholder="Project title" required>
             <textarea id="projectFormDescription" placeholder="Project description (optional)" rows="3"></textarea>
+            <select id="projectFormQuadrant" required>
+              <option value="">Select Priority Quadrant</option>
+              <option value="urgent-important">Do First (Urgent & Important)</option>
+              <option value="not-urgent-important">Schedule (Not Urgent & Important)</option>
+              <option value="urgent-not-important">Delegate (Urgent & Not Important)</option>
+              <option value="not-urgent-not-important">Eliminate (Not Urgent & Not Important)</option>
+            </select>
             <div class="modal-actions">
               <button type="button" id="cancelProject" class="btn">Cancel</button>
               <button type="submit" class="btn primary">Create Project</button>

@@ -76,16 +76,16 @@ body[data-theme=light] .task-item:hover,body[data-theme=light] .project-card:hov
 .quadrant-description{margin:0 0 16px 0;font-size:14px;color:var(--sub)}
 .projects-container{flex:1;overflow-y:auto;min-height:200px}
 .projects-container:empty::after{content:"Drop projects here";color:var(--sub);font-style:italic;display:block;text-align:center;padding:20px}
-.project-card{background:rgba(43,212,194,.1);border:1px solid rgba(43,212,194,.3);border-radius:12px;padding:16px;margin-bottom:12px;transition:transform .08s ease,box-shadow .12s ease,border-color .12s ease;cursor:pointer;position:relative;min-height:160px;display:flex;flex-direction:column;max-width:100%}
+.project-card{background:rgba(43,212,194,.1);border:1px solid rgba(43,212,194,.3);border-radius:12px;padding:12px;margin-bottom:12px;transition:transform .08s ease,box-shadow .12s ease,border-color .12s ease;cursor:pointer;position:relative;min-height:100px;display:flex;flex-direction:column;max-width:100%}
 .project-card:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(43,212,194,.25);border-color:var(--accent)}
 .project-card.dragging{opacity:0.5;transform:rotate(5deg)}
-.project-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;gap:8px}
+.project-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;gap:8px}
 .project-title{margin:0;font-size:16px;color:var(--text);line-height:1.3;font-weight:600;flex:1;word-break:break-word}
 .project-status{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
 .task-count{font-size:11px;color:var(--sub);background:rgba(43,212,194,.2);padding:2px 6px;border-radius:8px;white-space:nowrap}
-.project-description{margin:0 0 16px 0;font-size:13px;color:var(--sub);line-height:1.4;flex:1;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;line-clamp:3;-webkit-box-orient:vertical;word-break:break-word}
-.project-progress{margin-top:auto}
-.progress-bar{background:rgba(255,255,255,.1);border-radius:8px;height:8px;overflow:hidden;position:relative;width:100%}
+.project-description{margin:0 0 6px 0;font-size:13px;color:var(--sub);line-height:1.4;flex:1;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;word-break:break-word;background:rgba(43,212,194,0.03);padding:6px 10px;border-radius:6px;border-left:3px solid rgba(43,212,194,0.2);font-style:italic}
+.project-progress{margin-top:8px;max-width:200px}
+.progress-bar{background:rgba(255,255,255,.1);border-radius:6px;height:10px;overflow:hidden;position:relative;width:100%;box-shadow:inset 0 1px 3px rgba(0,0,0,0.1)}
 .progress-fill{background:linear-gradient(90deg,var(--accent),var(--green));height:100%;transition:width .5s cubic-bezier(0.4, 0, 0.2, 1);border-radius:8px;position:relative}
 .progress-fill::after{content:'';position:absolute;top:0;left:0;right:0;bottom:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent);animation:progress-shine 2s infinite}
 .progress-text{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:10px;color:var(--text);font-weight:600;text-shadow:0 1px 2px rgba(0,0,0,0.3);transition:all .3s ease}
@@ -280,8 +280,15 @@ body[data-theme=light] .subtasks-section {
   margin: 0;
 }
 
-.subtask-title {
+.subtask-content {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.subtask-title {
   font-size: 13px;
   color: var(--text);
   line-height: 1.3;
@@ -290,6 +297,19 @@ body[data-theme=light] .subtasks-section {
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 200px; /* Limit maximum width */
+}
+
+.subtask-description {
+  font-size: 11px;
+  color: var(--sub);
+  line-height: 1.4;
+  word-break: break-word;
+  background: rgba(43, 212, 194, 0.02);
+  padding: 4px 8px;
+  border-radius: 3px;
+  border-left: 2px solid rgba(43, 212, 194, 0.1);
+  font-style: italic;
+  margin-top: 2px;
 }
 
 .subtask-title.completed {
@@ -389,7 +409,7 @@ body[data-theme=light] .subtasks-section {
 .icon-text{font-size:14px;font-weight:500;line-height:1}
 .btn-icon.small .icon-text{font-size:12px}
 
-.task-description{font-size:13px;color:var(--sub);margin:0;line-height:1.4;word-break:break-word}
+.task-description{font-size:13px;color:var(--sub);margin:4px 0 0 0;line-height:1.5;word-break:break-word;background:rgba(43,212,194,0.02);padding:6px 10px;border-radius:4px;border-left:2px solid rgba(43,212,194,0.15);font-style:italic;font-size:12px}
 
 /* Subtasks section styling */
 
@@ -406,6 +426,11 @@ body[data-theme=light] .modal-header{border-bottom-color:#e5e7eb}
 .modal-header h3{margin:0;color:var(--text)}
 .modal form{padding:20px}
 .modal form input,.modal form textarea,.modal form select{width:100%;margin-bottom:16px}
+.modal form textarea{background:rgba(43,212,194,0.03);border:1px solid rgba(43,212,194,0.2);border-radius:6px;padding:8px 12px;font-style:italic;color:var(--text);resize:vertical;min-height:60px;line-height:1.5;transition:all 0.2s ease}
+.modal form textarea::placeholder{color:var(--sub);font-style:italic;opacity:0.7}
+.modal form textarea:focus{outline:none;border-color:var(--accent);background:rgba(43,212,194,0.05);box-shadow:0 0 0 2px rgba(43,212,194,0.1)}
+body[data-theme=light] .modal form textarea{background:rgba(14,165,233,0.03);border-color:rgba(14,165,233,0.2)}
+body[data-theme=light] .modal form textarea:focus{background:rgba(14,165,233,0.05);border-color:var(--accent);box-shadow:0 0 0 2px rgba(14,165,233,0.1)}
 .form-row{display:flex;gap:12px}
 .form-row select{flex:1;min-width:120px}
 .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
@@ -418,7 +443,7 @@ body[data-theme=light] .modal-header{border-bottom-color:#e5e7eb}
   .filters{flex-direction:column}
   .modal-content{min-width:300px;margin:16px}
   .eisenhower-grid{grid-template-columns:1fr;gap:12px;height:auto}
-  .project-card{min-height:140px;padding:12px}
+  .project-card{min-height:90px;padding:10px}
   .project-title{font-size:14px}
   .project-description{font-size:12px;-webkit-line-clamp:2;line-clamp:2}
   .task-item{padding:12px}
@@ -438,6 +463,10 @@ body[data-theme=light] .modal-header{border-bottom-color:#e5e7eb}
   .subtask-checkbox{width:12px;height:12px}
   .subtask-progress-bar{height:3px}
   .subtask-due-date{font-size:10px;padding:1px 4px}
+  .project-description{font-size:12px;padding:6px 10px}
+  .task-description{font-size:11px;padding:4px 8px}
+  .subtask-description{font-size:10px;padding:3px 6px}
+  .modal form textarea{min-height:50px;padding:6px 10px;font-size:13px}
 }
 @media (max-width:760px){.grid{grid-template-columns:1fr}}
 @media (max-width:760px){

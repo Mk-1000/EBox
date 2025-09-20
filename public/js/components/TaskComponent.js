@@ -199,11 +199,17 @@ export class TaskComponent {
 
         const subtaskElement = el('div', { className: 'subtask-item' }, [
           checkbox,
-          el('span', { 
-            className: `subtask-title ${subtask.completed ? 'completed' : ''}`,
-            textContent: subtask.title,
-            title: subtask.title // Show full title on hover
-          }),
+          el('div', { className: 'subtask-content' }, [
+            el('span', { 
+              className: `subtask-title ${subtask.completed ? 'completed' : ''}`,
+              textContent: subtask.title,
+              title: subtask.title // Show full title on hover
+            }),
+            subtask.description ? el('div', { 
+              className: 'subtask-description',
+              textContent: subtask.description 
+            }) : null
+          ]),
           el('div', { className: 'subtask-meta' }, [
             el('span', { 
               className: `priority-dot priority-${subtask.priority.toLowerCase()}`,
