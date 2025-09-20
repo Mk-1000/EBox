@@ -1,0 +1,25 @@
+# Ignore development files
+node_modules/
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Ignore database files
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# Ignore test files
+test/
+tests/
+__tests__/
+
+# Ignore documentation
+README.md
+*.md
+
+# Ignore git files
+.git/
+.gitignore
