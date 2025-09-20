@@ -19,6 +19,11 @@ class EBoxApp {
       console.log('Initializing EBox application...');
       console.log('API_BASE:', window.location.origin);
       
+      // Check for module loading issues
+      if (typeof require !== 'undefined') {
+        throw new Error('CommonJS require() detected in browser environment. This suggests a build configuration issue.');
+      }
+      
       // Test API connectivity
       try {
         const { apiService } = await import('./services/api.js');
