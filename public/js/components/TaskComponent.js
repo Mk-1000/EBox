@@ -379,7 +379,18 @@ export class TaskComponent {
     $('#taskDescription').value = task.description || '';
     $('#taskPriority').value = task.priority;
     $('#taskStatus').value = task.status;
-    $('#taskDueDate').value = task.dueDate || '';
+    
+    // Format due date for HTML date input (YYYY-MM-DD)
+    if (task.dueDate) {
+      const date = new Date(task.dueDate);
+      if (!isNaN(date.getTime())) {
+        $('#taskDueDate').value = date.toISOString().split('T')[0];
+      } else {
+        $('#taskDueDate').value = '';
+      }
+    } else {
+      $('#taskDueDate').value = '';
+    }
     
     this.showTaskModal();
   }
@@ -717,13 +728,24 @@ export class TaskComponent {
 
   editSubtask(subtask) {
     this.currentEditingSubtask = subtask;
-    this.currentParentTaskId = subtask.parent_task_id;
+    this.currentParentTaskId = subtask.parentTaskId;
     
     // Populate the form with existing subtask data
     $('#subtaskTitle').value = subtask.title;
     $('#subtaskDescription').value = subtask.description || '';
     $('#subtaskPriority').value = subtask.priority;
-    $('#subtaskDueDate').value = subtask.dueDate || '';
+    
+    // Format due date for HTML date input (YYYY-MM-DD)
+    if (subtask.dueDate) {
+      const date = new Date(subtask.dueDate);
+      if (!isNaN(date.getTime())) {
+        $('#subtaskDueDate').value = date.toISOString().split('T')[0];
+      } else {
+        $('#subtaskDueDate').value = '';
+      }
+    } else {
+      $('#subtaskDueDate').value = '';
+    }
     
     // Update modal title
     $('#subtaskModal h3').textContent = 'Edit Subtask';
