@@ -1,5 +1,5 @@
 // Project management component
-import { $, $$, el } from '../core/utils.js';
+import { $, $$, el, debounce } from '../core/utils.js';
 import { apiService } from '../services/api.js';
 import { stateManager } from '../core/state.js';
 import { eventBus, EVENTS } from '../core/events.js';
@@ -27,6 +27,9 @@ export class ProjectComponent {
     // Set up periodic progress bar updates
     this.setupProgressBarRefresh();
     
+    // Setup drag and drop after DOM is ready
+    this.setupDragAndDropWhenReady();
+    
     // Listen for user login to reload projects
     eventBus.on(EVENTS.USER_LOGIN, () => {
       console.log('User logged in, reloading projects');
@@ -52,11 +55,12 @@ export class ProjectComponent {
     eventBus.on(EVENTS.PROJECT_DELETED, () => this.loadProjects());
     eventBus.on(EVENTS.PROJECT_UPDATED, () => this.loadProjects());
     
-    // Listen for task changes to update progress bars dynamically
-    eventBus.on(EVENTS.TASK_CREATED, () => this.updateAllProgressBars());
-    eventBus.on(EVENTS.TASK_UPDATED, () => this.updateAllProgressBars());
-    eventBus.on(EVENTS.TASK_DELETED, () => this.updateAllProgressBars());
-    eventBus.on(EVENTS.TASK_STATUS_CHANGED, () => this.updateAllProgressBars());
+    // Listen for task changes to update progress bars dynamically (debounced for performance)
+    const debouncedUpdateProgress = debounce(() => this.updateAllProgressBars(), 500);
+    eventBus.on(EVENTS.TASK_CREATED, debouncedUpdateProgress);
+    eventBus.on(EVENTS.TASK_UPDATED, debouncedUpdateProgress);
+    eventBus.on(EVENTS.TASK_DELETED, debouncedUpdateProgress);
+    eventBus.on(EVENTS.TASK_STATUS_CHANGED, debouncedUpdateProgress);
     
     // Listen for state changes to update progress bars
     stateManager.subscribe('tasks', () => this.updateAllProgressBars());
@@ -416,6 +420,79 @@ export class ProjectComponent {
     }
   }
 
+  setupDragAndDropWhenReady() {
+    // Wait for DOM to be ready and quadrants to exist
+    const checkAndSetup = () => {
+      const quadrants = $$('.eisenhower-quadrant');
+      if (quadrants.length > 0) {
+        this.setupQuadrantDropZones();
+        console.log('✅ Project drag and drop setup completed');
+      } else {
+        // Retry after a short delay
+        setTimeout(checkAndSetup, 100);
+      }
+    };
+    checkAndSetup();
+  }
+
+  setupQuadrantDropZones() {
+    // Setup drop zones for quadrants (only once)
+    $$('.eisenhower-quadrant').forEach(quadrant => {
+      quadrant.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        
+        // Remove previous dragover
+        $$('.eisenhower-quadrant').forEach(quad => {
+          quad.classList.remove('dragover');
+          quad.style.backgroundColor = '';
+          quad.style.border = '';
+        });
+        
+        // Add dragover to current quadrant
+        quadrant.classList.add('dragover');
+        
+        // Add visual feedback
+        quadrant.style.backgroundColor = 'rgba(0, 123, 255, 0.1)';
+        quadrant.style.border = '2px dashed #007bff';
+      });
+
+      quadrant.addEventListener('dragleave', (e) => {
+        // Only remove if we're actually leaving the quadrant
+        if (!quadrant.contains(e.relatedTarget)) {
+          quadrant.classList.remove('dragover');
+          quadrant.style.backgroundColor = '';
+          quadrant.style.border = '';
+        }
+      });
+
+      quadrant.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        quadrant.classList.remove('dragover');
+        quadrant.style.backgroundColor = '';
+        quadrant.style.border = '';
+        
+        // Find the dragged project element
+        const draggedElement = document.querySelector('.project-card.dragging');
+        if (draggedElement) {
+          const projectId = draggedElement.getAttribute('data-project-id');
+          const newQuadrant = quadrant.getAttribute('data-quadrant');
+          
+          if (projectId && newQuadrant) {
+            // Find the project data
+            const currentState = stateManager.getState();
+            const project = currentState.projects.find(p => p.id == projectId);
+            
+            if (project && newQuadrant !== project.quadrant) {
+              // Optimistic update - immediate UI feedback
+              this.updateProjectQuadrantOptimistic(project.id, newQuadrant);
+            }
+          }
+        }
+      });
+    });
+  }
+
   setupProjectDragAndDrop(projectEl, project) {
     let draggedProject = null;
     let dragOverQuadrant = null;
@@ -456,52 +533,7 @@ export class ProjectComponent {
       });
     });
 
-    // Setup drop zones (quadrants)
-    $$('.eisenhower-quadrant').forEach(quadrant => {
-      quadrant.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        
-        // Remove previous dragover
-        $$('.eisenhower-quadrant').forEach(quad => {
-          quad.classList.remove('dragover');
-          quad.style.backgroundColor = '';
-          quad.style.border = '';
-        });
-        
-        // Add dragover to current quadrant
-        quadrant.classList.add('dragover');
-        dragOverQuadrant = quadrant;
-        
-        // Add visual feedback
-        quadrant.style.backgroundColor = 'rgba(0, 123, 255, 0.1)';
-        quadrant.style.border = '2px dashed #007bff';
-      });
-
-      quadrant.addEventListener('dragleave', (e) => {
-        // Only remove if we're actually leaving the quadrant
-        if (!quadrant.contains(e.relatedTarget)) {
-          quadrant.classList.remove('dragover');
-          quadrant.style.backgroundColor = '';
-          quadrant.style.border = '';
-        }
-      });
-
-      quadrant.addEventListener('drop', async (e) => {
-        e.preventDefault();
-        quadrant.classList.remove('dragover');
-        quadrant.style.backgroundColor = '';
-        quadrant.style.border = '';
-        
-        if (draggedProject) {
-          const newQuadrant = quadrant.getAttribute('data-quadrant');
-          if (newQuadrant && newQuadrant !== project.quadrant) {
-            // Optimistic update - immediate UI feedback
-            this.updateProjectQuadrantOptimistic(project.id, newQuadrant);
-          }
-        }
-      });
-    });
+    // Drop zones are set up globally in setupQuadrantDropZones()
   }
 
   // Optimistic update for project quadrant

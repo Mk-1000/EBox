@@ -1,5 +1,5 @@
 // Task management component
-import { $, $$, el } from '../core/utils.js';
+import { $, $$, el, debounce } from '../core/utils.js';
 import { apiService } from '../services/api.js';
 import { stateManager } from '../core/state.js';
 import { eventBus, EVENTS } from '../core/events.js';
@@ -23,6 +23,8 @@ export class TaskComponent {
   initialize() {
     this.setupEventListeners();
     // Don't load tasks immediately - wait for project selection
+    // Setup drag and drop after DOM is ready
+    this.setupDragAndDropWhenReady();
   }
 
   setupEventListeners() {
@@ -36,13 +38,13 @@ export class TaskComponent {
     $('#closeSubtaskModal').addEventListener('click', () => this.hideSubtaskModal());
     $('#cancelSubtask').addEventListener('click', () => this.hideSubtaskModal());
     
-    // Filters
-    $('#statusFilter').addEventListener('change', () => this.loadTasks());
-    $('#priorityFilter').addEventListener('change', () => this.loadTasks());
-    $('#sortBy').addEventListener('change', () => this.loadTasks());
+    // Filters with debouncing for better performance
+    const debouncedLoadTasks = debounce(() => this.loadTasks(), 300);
+    $('#statusFilter').addEventListener('change', debouncedLoadTasks);
+    $('#priorityFilter').addEventListener('change', debouncedLoadTasks);
+    $('#sortBy').addEventListener('change', debouncedLoadTasks);
     
-    // Setup drag and drop for kanban columns (only once)
-    this.setupKanbanDropZones();
+    // Drag and drop will be set up when DOM is ready
     
     // Listen for events
     eventBus.on(EVENTS.PROJECT_SELECTED, () => this.loadTasks());
@@ -524,9 +526,22 @@ export class TaskComponent {
     this.currentEditingTask = null;
   }
 
-  setupKanbanDropZones() {
-    let draggedTask = null;
+  setupDragAndDropWhenReady() {
+    // Wait for DOM to be ready and kanban columns to exist
+    const checkAndSetup = () => {
+      const kanbanColumns = $$('.kanban-column');
+      if (kanbanColumns.length > 0) {
+        this.setupKanbanDropZones();
+        console.log('✅ Task drag and drop setup completed');
+      } else {
+        // Retry after a short delay
+        setTimeout(checkAndSetup, 100);
+      }
+    };
+    checkAndSetup();
+  }
 
+  setupKanbanDropZones() {
     // Setup drop zones (kanban columns) - only once
     $$('.kanban-column').forEach(column => {
       column.addEventListener('dragover', (e) => {
@@ -560,32 +575,24 @@ export class TaskComponent {
         column.style.backgroundColor = '';
         column.style.border = '';
         
-        if (this.draggedTask) {
+        // Find the dragged task element
+        const draggedElement = document.querySelector('.task-item.dragging');
+        if (draggedElement) {
+          const taskId = draggedElement.getAttribute('data-task-id');
           const newStatus = column.getAttribute('data-status');
-          if (newStatus && newStatus !== this.draggedTask.status) {
-            // Optimistic update - immediate UI feedback
-            this.updateTaskStatusOptimistic(this.draggedTask.id, newStatus);
+          
+          if (taskId && newStatus) {
+            // Find the task data from current state
+            const currentState = stateManager.getState();
+            const task = currentState.tasks.find(t => t.id == taskId);
+            
+            if (task && newStatus !== task.status) {
+              // Optimistic update - immediate UI feedback
+              this.updateTaskStatusOptimistic(task.id, newStatus);
+            }
           }
         }
       });
-    });
-
-    // Store reference to draggedTask for use in drop handlers
-    this.draggedTask = null;
-    
-    // Global drag start handler
-    document.addEventListener('dragstart', (e) => {
-      if (e.target.classList.contains('task-item')) {
-        const taskId = e.target.getAttribute('data-task-id');
-        if (taskId) {
-          // Find the task data from current state
-          const currentState = stateManager.getState();
-          const task = currentState.tasks.find(t => t.id == taskId);
-          if (task) {
-            this.draggedTask = task;
-          }
-        }
-      }
     });
 
     // Global drag end handler
@@ -597,7 +604,6 @@ export class TaskComponent {
           column.style.backgroundColor = '';
           column.style.border = '';
         });
-        this.draggedTask = null;
       }
     });
   }
