@@ -120,9 +120,13 @@ class TaskRepository extends ITaskRepository {
   }
 
   async save(task) {
+    console.log('TaskRepository.save called with task dueDate:', task.dueDate, 'Type:', typeof task.dueDate);
+    const params = [task.id, task.projectId, task.userId, task.title, task.description, task.priority, task.status, task.dueDate, task.parentTaskId, task.completed, task.createdAt, task.updatedAt];
+    console.log('TaskRepository.save params:', params);
+    
     await databaseConnection.query(
       'INSERT INTO tasks (id, project_id, user_id, title, description, priority, status, due_date, parent_task_id, completed, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE title = VALUES(title), description = VALUES(description), priority = VALUES(priority), status = VALUES(status), due_date = VALUES(due_date), completed = VALUES(completed), updated_at = VALUES(updated_at)',
-      [task.id, task.projectId, task.userId, task.title, task.description, task.priority, task.status, task.dueDate, task.parentTaskId, task.completed, task.createdAt, task.updatedAt]
+      params
     );
     return task;
   }

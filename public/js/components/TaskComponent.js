@@ -14,6 +14,7 @@ export class TaskComponent {
     this.subtaskModal = $('#subtaskModal');
     this.subtaskForm = $('#subtaskForm');
     this.currentEditingTask = null;
+    this.currentEditingSubtask = null;
     this.currentParentTaskId = null;
     
     this.initialize();
@@ -68,6 +69,9 @@ export class TaskComponent {
       
       const response = await apiService.getTasksByProject(currentProject.id, filters);
       
+      console.log('Loaded tasks:', response.tasks);
+      console.log('First task dueDate:', response.tasks[0]?.dueDate);
+      
       stateManager.setTasks(response.tasks);
       this.renderTasks(response.tasks);
       eventBus.emit(EVENTS.TASKS_LOADED, response.tasks);
@@ -80,6 +84,8 @@ export class TaskComponent {
   }
 
   renderTasks(tasks) {
+    console.log('Rendering tasks:', tasks);
+    
     // Clear existing tasks
     const columns = {
       'To Do': $('#list-todo'),
@@ -93,6 +99,7 @@ export class TaskComponent {
 
     // Filter out subtasks - only render parent tasks
     const parentTasks = tasks.filter(task => !task.parent_task_id);
+    console.log('Parent tasks to render:', parentTasks);
 
     // Render each parent task with its subtasks
     parentTasks.forEach(task => {
@@ -113,6 +120,8 @@ export class TaskComponent {
   }
 
   createTaskElement(task, subtasks = []) {
+    console.log('Creating task element for:', task.title, 'dueDate:', task.dueDate);
+    
     const isSubtask = task.parent_task_id !== null;
     const children = [
       el('div', { className: 'task-header' }, [
@@ -133,6 +142,15 @@ export class TaskComponent {
               })
             ])
           ]),
+          task.dueDate ? (() => {
+            console.log('Task has dueDate:', task.dueDate, 'calculating remaining time...');
+            const remainingTime = this.formatRemainingTime(task.dueDate);
+            console.log('Remaining time result:', remainingTime);
+            return remainingTime ? el('div', { 
+              className: `remaining-time ${remainingTime.urgent ? 'urgent' : ''}`,
+              textContent: remainingTime.text
+            }) : null;
+          })() : null,
           task.description ? el('p', { 
             className: 'task-description',
             textContent: task.description 
@@ -144,7 +162,7 @@ export class TaskComponent {
             title: 'Edit task',
             onclick: () => this.editTask(task)
           }, [
-            el('span', { className: 'icon-text', textContent: '✏' })
+            el('span', { className: 'icon-text', textContent: '✎' })
           ]),
           el('button', {
             className: 'btn-icon add-subtask',
@@ -186,7 +204,8 @@ export class TaskComponent {
           checkbox,
           el('span', { 
             className: `subtask-title ${subtask.completed ? 'completed' : ''}`,
-            textContent: subtask.title 
+            textContent: subtask.title,
+            title: subtask.title // Show full title on hover
           }),
           el('div', { className: 'subtask-meta' }, [
             subtask.dueDate ? el('span', { 
@@ -197,6 +216,29 @@ export class TaskComponent {
               className: `priority-dot priority-${subtask.priority.toLowerCase()}`,
               title: subtask.priority
             })
+          ]),
+          subtask.dueDate ? (() => {
+            const remainingTime = this.formatRemainingTime(subtask.dueDate);
+            return remainingTime ? el('div', { 
+              className: `subtask-remaining-time ${remainingTime.urgent ? 'urgent' : ''}`,
+              textContent: remainingTime.text
+            }) : null;
+          })() : null,
+          el('div', { className: 'subtask-actions' }, [
+            el('button', {
+              className: 'btn-icon small',
+              title: 'Edit subtask',
+              onclick: () => this.editSubtask(subtask)
+            }, [
+              el('span', { className: 'icon-text', textContent: '✎' })
+            ]),
+            el('button', {
+              className: 'btn-icon small danger',
+              title: 'Delete subtask',
+              onclick: () => this.deleteSubtask(subtask.id)
+            }, [
+              el('span', { className: 'icon-text', textContent: '×' })
+            ])
           ])
         ]);
 
@@ -263,7 +305,9 @@ export class TaskComponent {
 
     const title = $('#newTaskTitle').value.trim();
     const priority = $('#newTaskPriority').value;
-    const dueDate = $('#newTaskDueDate').value || null;
+    const dueDate = this.normalizeDueDate($('#newTaskDueDate').value);
+    
+    console.log('Creating task with dueDate:', dueDate);
 
     if (!title) {
       alert('Task title is required');
@@ -301,7 +345,9 @@ export class TaskComponent {
     const description = $('#taskDescription').value.trim();
     const priority = $('#taskPriority').value;
     const status = $('#taskStatus').value;
-    const dueDate = $('#taskDueDate').value || null;
+    const dueDate = this.normalizeDueDate($('#taskDueDate').value);
+    
+    console.log('Updating task with dueDate:', dueDate);
 
     if (!title) {
       alert('Task title is required');
@@ -317,6 +363,9 @@ export class TaskComponent {
         status,
         dueDate
       });
+      
+      console.log('Task update response:', response);
+      console.log('Updated task dueDate:', response.task?.dueDate);
       
       this.hideTaskModal();
       eventBus.emit(EVENTS.TASK_UPDATED, response.task);
@@ -351,6 +400,22 @@ export class TaskComponent {
       this.updateProjectProgress();
     } catch (error) {
       console.error('Failed to delete task:', error);
+      eventBus.emit(EVENTS.ERROR_OCCURRED, error);
+    } finally {
+      stateManager.setLoading(false);
+    }
+  }
+
+  async deleteSubtask(subtaskId) {
+    if (!confirm('Are you sure you want to delete this subtask?')) return;
+
+    try {
+      stateManager.setLoading(true);
+      await apiService.deleteTask(subtaskId);
+      eventBus.emit(EVENTS.TASK_DELETED, subtaskId);
+      this.updateProjectProgress();
+    } catch (error) {
+      console.error('Failed to delete subtask:', error);
       eventBus.emit(EVENTS.ERROR_OCCURRED, error);
     } finally {
       stateManager.setLoading(false);
@@ -652,6 +717,24 @@ export class TaskComponent {
 
   addSubtask(parentTaskId) {
     this.currentParentTaskId = parentTaskId;
+    this.currentEditingSubtask = null;
+    this.showSubtaskModal();
+  }
+
+  editSubtask(subtask) {
+    this.currentEditingSubtask = subtask;
+    this.currentParentTaskId = subtask.parent_task_id;
+    
+    // Populate the form with existing subtask data
+    $('#subtaskTitle').value = subtask.title;
+    $('#subtaskDescription').value = subtask.description || '';
+    $('#subtaskPriority').value = subtask.priority;
+    $('#subtaskDueDate').value = subtask.dueDate || '';
+    
+    // Update modal title
+    $('#subtaskModal h3').textContent = 'Edit Subtask';
+    $('#subtaskForm button[type="submit"]').textContent = 'Update Subtask';
+    
     this.showSubtaskModal();
   }
 
@@ -666,7 +749,9 @@ export class TaskComponent {
     const title = $('#subtaskTitle').value.trim();
     const description = $('#subtaskDescription').value.trim();
     const priority = $('#subtaskPriority').value;
-    const dueDate = $('#subtaskDueDate').value || null;
+    const dueDate = this.normalizeDueDate($('#subtaskDueDate').value);
+    
+    console.log('Creating/updating subtask with dueDate:', dueDate);
 
     if (!title) {
       alert('Subtask title is required');
@@ -681,26 +766,42 @@ export class TaskComponent {
 
     try {
       stateManager.setLoading(true);
-      const response = await apiService.createTask(
-        currentProject.id,
-        title,
-        description,
-        priority,
-        TASK_STATUS.TO_DO,
-        dueDate,
-        this.currentParentTaskId,
-        false // completed: false by default for new subtasks
-      );
       
-      this.hideSubtaskModal();
-      eventBus.emit(EVENTS.TASK_CREATED, response.task);
+      if (this.currentEditingSubtask) {
+        // Update existing subtask
+        const response = await apiService.updateTask(this.currentEditingSubtask.id, {
+          title,
+          description,
+          priority,
+          dueDate
+        });
+        
+        this.hideSubtaskModal();
+        eventBus.emit(EVENTS.TASK_UPDATED, response.task);
+      } else {
+        // Create new subtask
+        const response = await apiService.createTask(
+          currentProject.id,
+          title,
+          description,
+          priority,
+          TASK_STATUS.TO_DO,
+          dueDate,
+          this.currentParentTaskId,
+          false // completed: false by default for new subtasks
+        );
+        
+        this.hideSubtaskModal();
+        eventBus.emit(EVENTS.TASK_CREATED, response.task);
+      }
+      
       // Force reload tasks to ensure subtasks appear
       setTimeout(() => {
         this.loadTasks();
         this.updateProjectProgress();
       }, 100);
     } catch (error) {
-      console.error('Failed to create subtask:', error);
+      console.error('Failed to save subtask:', error);
       eventBus.emit(EVENTS.ERROR_OCCURRED, error);
     } finally {
       stateManager.setLoading(false);
@@ -716,6 +817,11 @@ export class TaskComponent {
     this.subtaskModal.hidden = true;
     this.subtaskForm.reset();
     this.currentParentTaskId = null;
+    this.currentEditingSubtask = null;
+    
+    // Reset modal title and button text
+    $('#subtaskModal h3').textContent = 'Add Subtask';
+    $('#subtaskForm button[type="submit"]').textContent = 'Add Subtask';
   }
 
   updateProjectProgress() {
@@ -758,6 +864,56 @@ export class TaskComponent {
       return `Due in ${diffDays} days`;
     } else {
       return date.toLocaleDateString();
+    }
+  }
+
+  normalizeDueDate(dueDate) {
+    // Convert empty string to null, keep valid dates as is
+    if (!dueDate || dueDate.trim() === '') {
+      return null;
+    }
+    return dueDate;
+  }
+
+  formatRemainingTime(dueDate) {
+    console.log('formatRemainingTime called with:', dueDate, 'Type:', typeof dueDate);
+    if (!dueDate) {
+      console.log('No dueDate provided, returning null');
+      return null;
+    }
+    
+    const date = new Date(dueDate);
+    const now = new Date();
+    const diffTime = date - now;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const diffHours = Math.ceil(diffTime / (1000 * 60 * 60));
+    const diffMinutes = Math.ceil(diffTime / (1000 * 60));
+    
+    console.log('Date calculation:', { date, now, diffTime, diffDays, diffHours, diffMinutes });
+    
+    if (diffTime < 0) {
+      // Overdue
+      const overdueDays = Math.abs(diffDays);
+      const overdueHours = Math.abs(diffHours);
+      const overdueMinutes = Math.abs(diffMinutes);
+      
+      if (overdueDays > 0) {
+        return { text: `${overdueDays}d overdue`, urgent: true };
+      } else if (overdueHours > 0) {
+        return { text: `${overdueHours}h overdue`, urgent: true };
+      } else {
+        return { text: `${overdueMinutes}m overdue`, urgent: true };
+      }
+    } else if (diffTime === 0) {
+      return { text: 'Due now', urgent: true };
+    } else if (diffMinutes < 60) {
+      return { text: `${diffMinutes}m left`, urgent: diffMinutes <= 30 };
+    } else if (diffHours < 24) {
+      return { text: `${diffHours}h left`, urgent: diffHours <= 2 };
+    } else if (diffDays <= 7) {
+      return { text: `${diffDays}d left`, urgent: diffDays <= 1 };
+    } else {
+      return { text: `${diffDays}d left`, urgent: false };
     }
   }
 }

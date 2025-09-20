@@ -9,6 +9,8 @@ class TaskService {
   }
 
   async createTask(userId, projectId, title, description, priority, status, dueDate, parentTaskId) {
+    console.log('TaskService.createTask received dueDate:', dueDate, 'Type:', typeof dueDate);
+    
     // Verify project belongs to user
     const project = await this.projectRepository.findByUserIdAndId(userId, projectId);
     if (!project) {
@@ -73,6 +75,9 @@ class TaskService {
   }
 
   async updateTask(userId, taskId, updateData) {
+    console.log('TaskService.updateTask received updateData:', updateData);
+    console.log('Due date in updateData:', updateData.dueDate, 'Type:', typeof updateData.dueDate);
+    
     const task = await this.taskRepository.findByUserIdAndId(userId, taskId);
     if (!task) {
       throw new Error('Task not found');

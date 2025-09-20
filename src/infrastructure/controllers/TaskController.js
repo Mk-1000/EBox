@@ -42,6 +42,12 @@ class TaskController {
         parentTaskId = null 
       } = req.body;
       
+      // Normalize due date - convert empty string to null
+      const normalizedDueDate = (!dueDate || dueDate.trim() === '') ? null : dueDate;
+      
+      console.log('TaskController.createTask received dueDate:', dueDate, 'Type:', typeof dueDate);
+      console.log('TaskController.createTask normalized dueDate:', normalizedDueDate);
+      
       const task = await this.taskService.createTask(
         userId, 
         projectId, 
@@ -49,7 +55,7 @@ class TaskController {
         description, 
         priority, 
         status, 
-        dueDate, 
+        normalizedDueDate, 
         parentTaskId
       );
       res.status(201).json({ task });
@@ -70,12 +76,18 @@ class TaskController {
         dueDate 
       } = req.body;
       
+      // Normalize due date - convert empty string to null
+      const normalizedDueDate = (!dueDate || dueDate.trim() === '') ? null : dueDate;
+      
+      console.log('TaskController.updateTask received dueDate:', dueDate, 'Type:', typeof dueDate);
+      console.log('TaskController.updateTask normalized dueDate:', normalizedDueDate);
+      
       const task = await this.taskService.updateTask(userId, id, {
         title, 
         description, 
         priority, 
         status, 
-        dueDate
+        dueDate: normalizedDueDate
       });
       res.json({ task });
     } catch (error) {

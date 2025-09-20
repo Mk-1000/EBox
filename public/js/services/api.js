@@ -112,6 +112,7 @@ class ApiService {
   async createTask(projectId, title, description, priority, status, dueDate, parentTaskId, completed = false) {
     const body = { projectId, title, description, priority, status, dueDate, parentTaskId, completed };
     console.log('API createTask called with body:', body);
+    console.log('Due date value:', dueDate, 'Type:', typeof dueDate);
     return this.request('/api/tasks', {
       method: 'POST',
       body
@@ -119,6 +120,8 @@ class ApiService {
   }
 
   async updateTask(id, data) {
+    console.log('API updateTask called with id:', id, 'data:', data);
+    console.log('Due date in update data:', data.dueDate, 'Type:', typeof data.dueDate);
     return this.request(`/api/tasks/${id}`, {
       method: 'PUT',
       body: data

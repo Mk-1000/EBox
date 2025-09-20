@@ -123,8 +123,10 @@ class Task {
   }
 
   updateDueDate(dueDate) {
+    console.log('Task.updateDueDate called with:', dueDate, 'Type:', typeof dueDate);
     this._dueDate = dueDate;
     this._updatedAt = new Date();
+    console.log('Task._dueDate set to:', this._dueDate);
   }
 
   toggleCompletion() {
