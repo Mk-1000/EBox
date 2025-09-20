@@ -6,23 +6,29 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 
 require('dotenv').config();
-require('./db');
 
-const authRoutes = require('./auth');
-const projectRoutes = require('./projects');
-const taskRoutes = require('./tasks');
+// Import DDD components
+const container = require('./infrastructure/config/Container');
+const { errorHandler, notFoundHandler } = require('./infrastructure/middleware/ErrorMiddleware');
+
+// Import routes
+const authRoutes = require('./infrastructure/routes/AuthRoutes');
+const projectRoutes = require('./infrastructure/routes/ProjectRoutes');
+const taskRoutes = require('./infrastructure/routes/TaskRoutes');
 
 const app = express();
 
 // Trust proxy for secure cookies behind reverse proxies (e.g., Fly.io, Render, Nginx)
 app.set('trust proxy', 1);
 
+// Security and middleware
 app.use(helmet());
 app.use(cors({ origin: true, credentials: true }));
 app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Session configuration
 app.use(cookieSession({
   name: 'sid',
   keys: [process.env.SESSION_SECRET || 'dev_secret_change_me'],
@@ -35,28 +41,36 @@ app.use(cookieSession({
 // Health check endpoint
 app.get('/api/health', async (req, res) => {
   try {
-    const { pool } = require('./db');
-    await pool.query('SELECT 1');
-    res.json({ status: 'ok', database: 'connected' });
+    const databaseConnection = container.get('databaseConnection');
+    const healthStatus = await databaseConnection.healthCheck();
+    res.json(healthStatus);
   } catch (err) {
     console.error('Health check failed:', err);
     res.status(500).json({ status: 'error', database: 'disconnected', error: err.message });
   }
 });
 
+// API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/tasks', taskRoutes);
 
+// Static files
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
+// Catch-all handler for SPA
 app.get(/.*/, (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
 });
 
+// Error handling middleware
+app.use(errorHandler);
+app.use(notFoundHandler);
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Eisenhower Box app listening on http://localhost:${PORT}`);
+  console.log('DDD Architecture initialized successfully');
 });
 
-
+module.exports = app;

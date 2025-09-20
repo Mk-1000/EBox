@@ -10,7 +10,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-  <script defer src="https://cdn.vercel-insights.com/v1/script.debug.js"></script>
 </head>
 <body>
   <div id="app">
@@ -220,10 +219,36 @@
           </form>
         </div>
       </div>
+
+      <!-- Subtask Creation Modal -->
+      <div id="subtaskModal" class="modal" hidden>
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3>Add Subtask</h3>
+            <button id="closeSubtaskModal" class="btn icon">×</button>
+          </div>
+          <form id="subtaskForm">
+            <input id="subtaskTitle" placeholder="Subtask title" required>
+            <textarea id="subtaskDescription" placeholder="Subtask description (optional)" rows="2"></textarea>
+            <div class="form-row">
+              <select id="subtaskPriority">
+                <option value="High">High Priority</option>
+                <option value="Medium" selected>Medium Priority</option>
+                <option value="Low">Low Priority</option>
+              </select>
+              <input id="subtaskDueDate" type="date">
+            </div>
+            <div class="modal-actions">
+              <button type="button" id="cancelSubtask" class="btn">Cancel</button>
+              <button type="submit" class="btn primary">Add Subtask</button>
+            </div>
+          </form>
+        </div>
+      </div>
     </main>
   </div>
 
-  <script src="/js/app.js"></script>
+  <script type="module" src="/js/app.js"></script>
 </body>
 </html>
 
