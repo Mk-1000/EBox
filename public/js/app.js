@@ -16,12 +16,25 @@ class EBoxApp {
 
   async initialize() {
     try {
+      console.log('Initializing EBox application...');
+      console.log('API_BASE:', window.location.origin);
+      
+      // Test API connectivity
+      try {
+        const { apiService } = await import('./services/api.js');
+        const healthCheck = await apiService.healthCheck();
+        console.log('API health check successful:', healthCheck);
+      } catch (apiError) {
+        console.warn('API health check failed:', apiError);
+        // Don't fail the entire app if API is down, just log the warning
+      }
+      
       // Initialize state manager
       stateManager.initialize();
       
-      // Initialize components
-      this.components.theme = new ThemeComponent();
+      // Initialize components in proper order
       this.components.auth = new AuthComponent();
+      this.components.theme = new ThemeComponent();
       this.components.project = new ProjectComponent();
       this.components.task = new TaskComponent();
       this.components.syncStatus = new SyncStatusComponent();
@@ -34,9 +47,11 @@ class EBoxApp {
       this.setupGlobalEventListeners();
       
       console.log('EBox application initialized successfully');
+      window.EBoxAppLoaded = true;
     } catch (error) {
       console.error('Failed to initialize application:', error);
-      this.showError('Failed to initialize application');
+      this.showError('Failed to initialize application: ' + error.message);
+      window.EBoxAppLoaded = false;
     }
   }
 
@@ -44,12 +59,22 @@ class EBoxApp {
     // Global error handler
     window.addEventListener('error', (event) => {
       console.error('Global error:', event.error);
+      // Filter out common browser extension errors
+      if (event.message && event.message.includes('message channel closed')) {
+        console.warn('Browser extension message channel error (ignored):', event.message);
+        return;
+      }
       this.showError('An unexpected error occurred');
     });
 
     // Unhandled promise rejection handler
     window.addEventListener('unhandledrejection', (event) => {
       console.error('Unhandled promise rejection:', event.reason);
+      // Filter out common browser extension errors
+      if (event.reason && event.reason.message && event.reason.message.includes('message channel closed')) {
+        console.warn('Browser extension message channel error (ignored):', event.reason.message);
+        return;
+      }
       this.showError('An unexpected error occurred');
     });
 

@@ -26,6 +26,12 @@ export class ProjectComponent {
     
     // Set up periodic progress bar updates
     this.setupProgressBarRefresh();
+    
+    // Listen for user login to reload projects
+    eventBus.on(EVENTS.USER_LOGIN, () => {
+      console.log('User logged in, reloading projects');
+      this.loadProjects();
+    });
   }
 
   setupEventListeners() {
@@ -64,6 +70,11 @@ export class ProjectComponent {
       this.renderProjects(response.projects);
       eventBus.emit(EVENTS.PROJECTS_LOADED, response.projects);
     } catch (error) {
+      // Don't show error for 401 - user just needs to log in
+      if (error.message && error.message.includes('Not authenticated')) {
+        console.log('User not authenticated, projects will load after login');
+        return;
+      }
       console.error('Failed to load projects:', error);
       eventBus.emit(EVENTS.ERROR_OCCURRED, error);
     } finally {

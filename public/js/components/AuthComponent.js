@@ -29,7 +29,7 @@ export class AuthComponent {
     
     // Listen for auth events
     eventBus.on(EVENTS.USER_LOGIN, () => this.showApp());
-    eventBus.on(EVENTS.USER_LOGOUT, () => this.showAuth());
+    eventBus.on(EVENTS.USER_LOGOUT, () => this.handleLogout());
   }
 
   async checkAuthStatus() {
@@ -38,9 +38,11 @@ export class AuthComponent {
       if (response.user) {
         stateManager.setUser(response.user);
         eventBus.emit(EVENTS.USER_LOGIN, response.user);
+        console.log('User logged in successfully:', response.user.username);
       }
     } catch (error) {
       // User not authenticated, show auth form
+      console.log('User not authenticated, showing auth form');
       this.showAuth();
     }
   }
@@ -67,6 +69,7 @@ export class AuthComponent {
       if (response.user) {
         stateManager.setUser(response.user);
         eventBus.emit(EVENTS.USER_LOGIN, response.user);
+        console.log('User logged in successfully:', response.user.username);
       }
     } catch (error) {
       this.showError(error.message || 'Authentication failed');
@@ -112,13 +115,21 @@ export class AuthComponent {
     this.authError.style.display = 'none';
   }
 
-  async logout() {
+  async handleLogout() {
     try {
       await apiService.logout();
       stateManager.setUser(null);
-      eventBus.emit(EVENTS.USER_LOGOUT);
+      this.showAuth();
     } catch (error) {
       console.error('Logout error:', error);
+      // Even if API call fails, clear local state
+      stateManager.setUser(null);
+      this.showAuth();
     }
+  }
+
+  async logout() {
+    // This method can be called directly if needed
+    await this.handleLogout();
   }
 }

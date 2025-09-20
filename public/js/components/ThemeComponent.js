@@ -13,6 +13,10 @@ export class ThemeComponent {
     this.logoutBtn = $('#logoutBtn');
     this.usernameDisplay = $('#usernameDisplay');
     
+    // Ensure logout button is hidden by default
+    this.logoutBtn.hidden = true;
+    this.logoutBtn.style.display = 'none';
+    
     this.initialize();
   }
 
@@ -21,6 +25,7 @@ export class ThemeComponent {
     this.initializeTheme();
     this.initializeLanguage();
     this.setupMenu();
+    this.initializeUserDisplay();
   }
 
   setupEventListeners() {
@@ -31,7 +36,10 @@ export class ThemeComponent {
     // Listen for state changes
     stateManager.subscribe('theme', (theme) => this.applyTheme(theme));
     stateManager.subscribe('language', (lang) => this.applyLanguage(lang));
-    stateManager.subscribe('user', (user) => this.updateUserDisplay(user));
+    stateManager.subscribe('user', (user) => {
+      console.log('User state changed in ThemeComponent:', user);
+      this.updateUserDisplay(user);
+    });
   }
 
   setupMenu() {
@@ -53,6 +61,18 @@ export class ThemeComponent {
   initializeLanguage() {
     const savedLang = localStorage.getItem('ebox:lang') || 'en';
     stateManager.setLanguage(savedLang);
+  }
+
+  initializeUserDisplay() {
+    // Initialize user display based on current state
+    // Add a small delay to ensure auth check has completed
+    setTimeout(() => {
+      const currentUser = stateManager.getState().user;
+      console.log('Initializing user display with user:', currentUser);
+      console.log('Logout button hidden attribute:', this.logoutBtn.hidden);
+      console.log('Username display text:', this.usernameDisplay.textContent);
+      this.updateUserDisplay(currentUser);
+    }, 100);
   }
 
   toggleTheme() {
@@ -98,12 +118,17 @@ export class ThemeComponent {
   }
 
   updateUserDisplay(user) {
+    console.log('Updating user display:', user);
     if (user) {
       this.usernameDisplay.textContent = user.username;
       this.logoutBtn.hidden = false;
+      this.logoutBtn.style.display = 'block';
+      console.log('User logged in - showing username and logout button');
     } else {
       this.usernameDisplay.textContent = '';
       this.logoutBtn.hidden = true;
+      this.logoutBtn.style.display = 'none';
+      console.log('User logged out - hiding username and logout button');
     }
   }
 
@@ -130,10 +155,10 @@ export class ThemeComponent {
 
   async logout() {
     try {
-      // Import AuthComponent to access logout method
-      const { AuthComponent } = await import('./AuthComponent.js');
-      const authComponent = new AuthComponent();
-      await authComponent.logout();
+      // Close the menu first
+      this.closeMenu();
+      // Emit logout event to trigger the actual logout in AuthComponent
+      eventBus.emit(EVENTS.USER_LOGOUT);
     } catch (error) {
       console.error('Logout error:', error);
     }

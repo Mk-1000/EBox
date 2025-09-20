@@ -9,7 +9,18 @@ export const THEMES = {
   light: 'light' 
 };
 
-export const API_BASE = window.API_BASE || (window.location.origin.includes('localhost') ? '' : (window.API_BASE_URL || ''));
+// Determine API base URL based on environment
+export const API_BASE = (() => {
+  // Check if we're in development (localhost)
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return '';
+  }
+  
+  // For production, use the current origin
+  const baseUrl = window.location.origin;
+  console.log('API_BASE determined as:', baseUrl);
+  return baseUrl;
+})();
 
 export const QUADRANTS = {
   URGENT_IMPORTANT: 'urgent-important',

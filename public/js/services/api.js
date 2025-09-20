@@ -8,6 +8,8 @@ class ApiService {
 
   async request(path, options = {}) {
     const url = `${this.baseUrl}${path}`;
+    console.log('API request:', url, options);
+    
     const config = {
       headers: {
         'Content-Type': 'application/json',
@@ -23,15 +25,29 @@ class ApiService {
 
     try {
       const response = await fetch(url, config);
+      console.log('API response status:', response.status, response.statusText);
       
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `HTTP ${response.status}`);
+        let errorData = {};
+        try {
+          errorData = await response.json();
+        } catch (parseError) {
+          console.warn('Failed to parse error response:', parseError);
+        }
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
       }
 
-      return await response.json();
+      const data = await response.json();
+      console.log('API response data:', data);
+      return data;
     } catch (error) {
-      console.error('API request failed:', error);
+      // Don't log 401 errors as errors - they're expected when not authenticated
+      if (error.message && error.message.includes('Not authenticated')) {
+        console.log('API request returned 401 (expected when not authenticated):', url);
+      } else {
+        console.error('API request failed:', error);
+        console.error('Request details:', { url, config });
+      }
       throw error;
     }
   }
