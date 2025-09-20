@@ -69,6 +69,7 @@ export const EVENTS = {
   PROJECT_UPDATED: 'project:updated',
   PROJECT_DELETED: 'project:deleted',
   PROJECT_SELECTED: 'project:selected',
+  PROJECT_QUADRANT_CHANGED: 'project:quadrantChanged',
   
   // Task events
   TASKS_LOADED: 'tasks:loaded',
@@ -76,12 +77,22 @@ export const EVENTS = {
   TASK_UPDATED: 'task:updated',
   TASK_DELETED: 'task:deleted',
   TASK_STATUS_CHANGED: 'task:statusChanged',
+  TASK_MOVED: 'task:moved',
+  SUBTASK_COMPLETED: 'subtask:completed',
+  
+  // Real-time update events
+  OPTIMISTIC_UPDATE: 'realtime:optimisticUpdate',
+  SYNC_QUEUE_UPDATED: 'realtime:syncQueueUpdated',
+  SYNC_SUCCESS: 'realtime:syncSuccess',
+  SYNC_FAILED: 'realtime:syncFailed',
   
   // UI events
   THEME_CHANGED: 'ui:themeChanged',
   LANGUAGE_CHANGED: 'ui:languageChanged',
   MODAL_OPEN: 'ui:modalOpen',
   MODAL_CLOSE: 'ui:modalClose',
+  DRAG_START: 'ui:dragStart',
+  DRAG_END: 'ui:dragEnd',
   
   // Error events
   ERROR_OCCURRED: 'error:occurred',

@@ -5,6 +5,7 @@ import { AuthComponent } from './components/AuthComponent.js';
 import { ProjectComponent } from './components/ProjectComponent.js';
 import { TaskComponent } from './components/TaskComponent.js';
 import { ThemeComponent } from './components/ThemeComponent.js';
+import { SyncStatusComponent } from './components/SyncStatusComponent.js';
 
 class EBoxApp {
   constructor() {
@@ -22,6 +23,7 @@ class EBoxApp {
       this.components.auth = new AuthComponent();
       this.components.project = new ProjectComponent();
       this.components.task = new TaskComponent();
+      this.components.syncStatus = new SyncStatusComponent();
       
       // Setup global error handling
       this.setupErrorHandling();
@@ -106,6 +108,19 @@ class EBoxApp {
         errorDiv.parentNode.removeChild(errorDiv);
       }
     }, 5000);
+  }
+
+  // Cleanup method
+  destroy() {
+    // Cleanup state manager
+    stateManager.destroy();
+    
+    // Cleanup components
+    Object.values(this.components).forEach(component => {
+      if (component && typeof component.destroy === 'function') {
+        component.destroy();
+      }
+    });
   }
 }
 

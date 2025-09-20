@@ -48,6 +48,30 @@ body[data-theme=light] .btn.secondary{background:#f3f4f6;border-color:#e5e7eb}
 .eisenhower-grid{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:16px;margin-top:16px;height:calc(100vh - 200px);min-height:500px}
 .eisenhower-quadrant{background:var(--card);border:1px solid #1b2733;border-radius:12px;padding:20px;display:flex;flex-direction:column;transition:transform .08s ease,box-shadow .12s ease,border-color .12s ease}
 body[data-theme=light] .eisenhower-quadrant{border-color:#e5e7eb}
+
+/* Drag and Drop Enhancements */
+.dragging{opacity:0.5;transform:rotate(5deg);transition:all 0.2s ease}
+.dragover{background-color:rgba(0,123,255,0.1);border:2px dashed #007bff;transition:all 0.2s ease}
+.task-item,.project-card{transition:all 0.3s ease;cursor:grab}
+.task-item:active,.project-card:active{cursor:grabbing}
+.task-item:hover,.project-card:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(0,0,0,0.15)}
+body[data-theme=light] .task-item:hover,body[data-theme=light] .project-card:hover{box-shadow:0 8px 25px rgba(0,0,0,0.1)}
+
+/* Kanban Column Drag States */
+.kanban-column{transition:all 0.2s ease;min-height:200px}
+.kanban-column.dragover{background-color:rgba(0,123,255,0.1);border:2px dashed #007bff;transform:scale(1.02)}
+
+/* Project Quadrant Drag States */
+.eisenhower-quadrant.dragover{background-color:rgba(0,123,255,0.1);border:2px dashed #007bff;transform:scale(1.02)}
+
+/* Smooth Animations for Real-time Updates */
+.task-item.animating{transition:all 0.3s cubic-bezier(0.4, 0, 0.2, 1)}
+.project-card.animating{transition:all 0.3s cubic-bezier(0.4, 0, 0.2, 1)}
+
+/* Loading States */
+.syncing{position:relative}
+.syncing::after{content:'';position:absolute;top:4px;right:4px;width:8px;height:8px;border:2px solid #007bff;border-top:2px solid transparent;border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
 .eisenhower-quadrant h3{margin:0 0 8px 0;font-size:18px;color:var(--text)}
 .quadrant-description{margin:0 0 16px 0;font-size:14px;color:var(--sub)}
 .projects-container{flex:1;overflow-y:auto;min-height:200px}

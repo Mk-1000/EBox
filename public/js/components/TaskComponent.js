@@ -475,52 +475,40 @@ export class TaskComponent {
     console.log(`✅ Local state updated for subtask ${subtaskId}`);
   }
 
-  async toggleSubtaskCompletion(subtaskId, completed) {
-    try {
-      stateManager.setLoading(true);
-      console.log(`=== SUBTASK UPDATE START ===`);
-      console.log(`Subtask ID: ${subtaskId}`);
-      console.log(`Checkbox checked: ${completed}`);
-      console.log(`New completed: ${completed}`);
-      
-      // Call the API to update the subtask completion
-      console.log(`Calling API: toggleTaskCompletion(${subtaskId}, ${completed})`);
-      const response = await apiService.toggleTaskCompletion(subtaskId, completed);
-      console.log(`API Response:`, response);
-      console.log(`API Response Task Completed:`, response.task?.completed);
-      console.log(`API Response Task ID:`, response.task?.id);
-      
-      // Verify the update was successful
-      if (response && response.task) {
-        console.log(`✅ Subtask ${subtaskId} successfully updated to completed: ${response.task.completed}`);
-        console.log(`Response task data:`, response.task);
-        
-        // Update the local state instead of reloading all tasks
-        console.log(`Updating local state for subtask ${subtaskId}...`);
-        this.updateSubtaskInLocalState(subtaskId, response.task.completed);
-        
-        // Emit event to notify other components
-        eventBus.emit(EVENTS.TASK_STATUS_CHANGED, response.task);
-        
-        console.log(`✅ Subtask checkbox updated successfully`);
-        console.log(`=== SUBTASK UPDATE END ===`);
-      } else {
-        console.error(`❌ Invalid response from server:`, response);
-        throw new Error('Invalid response from server');
-      }
-    } catch (error) {
-      console.error(`❌ Failed to toggle subtask completion:`, error);
-      console.error(`Error details:`, error.message);
-      
-      // Show error message to user
-      eventBus.emit(EVENTS.ERROR_OCCURRED, new Error(`Failed to update subtask: ${error.message}`));
-      
-      // Reload tasks to revert any UI changes
-      console.log(`Reloading tasks to revert changes...`);
-      await this.loadTasks();
-    } finally {
-      stateManager.setLoading(false);
+  // Optimistic subtask completion toggle
+  toggleSubtaskCompletionOptimistic(subtaskId, completed) {
+    console.log(`=== OPTIMISTIC SUBTASK UPDATE START ===`);
+    console.log(`Subtask ID: ${subtaskId}`);
+    console.log(`New completed: ${completed}`);
+    
+    // Update state immediately
+    const success = stateManager.optimisticUpdateSubtaskCompletion(subtaskId, completed);
+    if (!success) {
+      console.error(`Failed to update subtask ${subtaskId} in state`);
+      return;
     }
+
+    // Update DOM immediately
+    this.updateSubtaskInLocalState(subtaskId, completed);
+    
+    // Add to sync queue for background update
+    stateManager.addToSyncQueue({
+      key: `subtask-${subtaskId}`,
+      type: 'subtask-completion',
+      subtaskId,
+      completed
+    });
+    
+    // Emit event to notify other components
+    eventBus.emit(EVENTS.TASK_STATUS_CHANGED, { id: subtaskId, completed });
+    
+    console.log(`✅ Optimistic subtask update completed`);
+    console.log(`=== OPTIMISTIC SUBTASK UPDATE END ===`);
+  }
+
+  // Legacy method for backward compatibility
+  async toggleSubtaskCompletion(subtaskId, completed) {
+    this.toggleSubtaskCompletionOptimistic(subtaskId, completed);
   }
 
   showTaskModal() {
@@ -536,6 +524,7 @@ export class TaskComponent {
 
   setupTaskDragAndDrop(taskEl, task) {
     let draggedTask = null;
+    let dragOverColumn = null;
 
     // Drag start
     taskEl.addEventListener('dragstart', (e) => {
@@ -543,12 +532,28 @@ export class TaskComponent {
       taskEl.classList.add('dragging');
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/html', taskEl.outerHTML);
+      
+      // Add visual feedback
+      taskEl.style.opacity = '0.5';
+      taskEl.style.transform = 'rotate(5deg)';
+      
+      // Add drag preview
+      const dragImage = taskEl.cloneNode(true);
+      dragImage.style.transform = 'rotate(5deg)';
+      dragImage.style.opacity = '0.8';
+      document.body.appendChild(dragImage);
+      e.dataTransfer.setDragImage(dragImage, 0, 0);
+      setTimeout(() => document.body.removeChild(dragImage), 0);
     });
 
     // Drag end
     taskEl.addEventListener('dragend', (e) => {
       taskEl.classList.remove('dragging');
+      taskEl.style.opacity = '';
+      taskEl.style.transform = '';
       draggedTask = null;
+      dragOverColumn = null;
+      
       // Remove dragover class from all columns
       $$('.kanban-column').forEach(column => {
         column.classList.remove('dragover');
@@ -560,92 +565,149 @@ export class TaskComponent {
       column.addEventListener('dragover', (e) => {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
+        
+        // Remove previous dragover
+        $$('.kanban-column').forEach(col => col.classList.remove('dragover'));
+        
+        // Add dragover to current column
         column.classList.add('dragover');
+        dragOverColumn = column;
+        
+        // Add visual feedback
+        column.style.backgroundColor = 'rgba(0, 123, 255, 0.1)';
+        column.style.border = '2px dashed #007bff';
       });
 
       column.addEventListener('dragleave', (e) => {
-        column.classList.remove('dragover');
+        // Only remove if we're actually leaving the column
+        if (!column.contains(e.relatedTarget)) {
+          column.classList.remove('dragover');
+          column.style.backgroundColor = '';
+          column.style.border = '';
+        }
       });
 
       column.addEventListener('drop', async (e) => {
         e.preventDefault();
         column.classList.remove('dragover');
+        column.style.backgroundColor = '';
+        column.style.border = '';
         
         if (draggedTask) {
           const newStatus = column.getAttribute('data-status');
           if (newStatus && newStatus !== task.status) {
-            try {
-              await this.updateTaskStatus(task.id, newStatus);
-            } catch (error) {
-              console.error('Failed to update task status:', error);
-              eventBus.emit(EVENTS.ERROR_OCCURRED, error);
-            }
+            // Optimistic update - immediate UI feedback
+            this.updateTaskStatusOptimistic(task.id, newStatus);
           }
         }
       });
     });
   }
 
-  async updateTaskStatus(taskId, status) {
-    try {
-      stateManager.setLoading(true);
-      const response = await apiService.updateTaskStatus(taskId, status);
-      
-      // If task is moved to "Done", auto-complete all its subtasks
-      if (status === 'Done') {
-        console.log(`Task ${taskId} moved to Done, auto-completing all subtasks...`);
-        await this.autoCompleteSubtasks(taskId);
-      }
-      
-      // Reload tasks to reflect the change
-      await this.loadTasks();
-      eventBus.emit(EVENTS.TASK_STATUS_CHANGED, response.task);
-    } catch (error) {
-      console.error('Failed to update task status:', error);
-      eventBus.emit(EVENTS.ERROR_OCCURRED, error);
-    } finally {
-      stateManager.setLoading(false);
+  // Optimistic update for task status
+  updateTaskStatusOptimistic(taskId, newStatus) {
+    console.log(`Optimistic update: Moving task ${taskId} to ${newStatus}`);
+    
+    // Update state immediately
+    const updatedTask = stateManager.optimisticUpdateTaskStatus(taskId, newStatus);
+    if (!updatedTask) {
+      console.error('Failed to update task in state');
+      return;
     }
+
+    // Move task visually in DOM immediately
+    this.moveTaskInDOM(taskId, newStatus);
+    
+    // Add to sync queue for background update
+    stateManager.addToSyncQueue({
+      key: `task-${taskId}`,
+      type: 'task-status',
+      taskId,
+      newStatus
+    });
+
+    // If task is moved to "Done", auto-complete all its subtasks
+    if (newStatus === 'Done') {
+      console.log(`Task ${taskId} moved to Done, auto-completing all subtasks...`);
+      this.autoCompleteSubtasksOptimistic(taskId);
+    }
+    
+    // Emit event for other components
+    eventBus.emit(EVENTS.TASK_STATUS_CHANGED, updatedTask);
   }
 
-  async autoCompleteSubtasks(parentTaskId) {
-    try {
-      console.log(`Auto-completing subtasks for parent task ${parentTaskId}...`);
-      
-      // Get current tasks from state manager
-      const currentState = stateManager.getState();
-      const tasks = currentState.tasks;
-      
-      // Find the parent task and its subtasks
-      const parentTask = tasks.find(task => task.id === parentTaskId);
-      if (!parentTask || !parentTask.subtasks || parentTask.subtasks.length === 0) {
-        console.log(`No subtasks found for parent task ${parentTaskId}`);
-        return;
-      }
-      
-      console.log(`Found ${parentTask.subtasks.length} subtasks to auto-complete`);
-      
-      // Auto-complete all subtasks that are not already completed
-      const incompleteSubtasks = parentTask.subtasks.filter(subtask => !subtask.completed);
-      console.log(`Found ${incompleteSubtasks.length} incomplete subtasks to complete`);
-      
-      // Update each incomplete subtask
-      for (const subtask of incompleteSubtasks) {
-        try {
-          console.log(`Auto-completing subtask ${subtask.id}: ${subtask.title}`);
-          await apiService.toggleTaskCompletion(subtask.id, true);
-          
-          // Update local state immediately
-          this.updateSubtaskInLocalState(subtask.id, true);
-        } catch (error) {
-          console.error(`Failed to auto-complete subtask ${subtask.id}:`, error);
-        }
-      }
-      
-      console.log(`✅ Auto-completed ${incompleteSubtasks.length} subtasks for parent task ${parentTaskId}`);
-    } catch (error) {
-      console.error(`Failed to auto-complete subtasks for parent task ${parentTaskId}:`, error);
+  // Move task in DOM without reloading
+  moveTaskInDOM(taskId, newStatus) {
+    const taskElement = document.querySelector(`[data-task-id="${taskId}"]`);
+    if (!taskElement) return;
+
+    const targetColumn = document.querySelector(`[data-status="${newStatus}"]`);
+    if (!targetColumn) return;
+
+    // Remove from current position
+    taskElement.remove();
+    
+    // Add to new position with animation
+    taskElement.style.opacity = '0';
+    taskElement.style.transform = 'scale(0.8)';
+    targetColumn.appendChild(taskElement);
+    
+    // Animate in
+    requestAnimationFrame(() => {
+      taskElement.style.transition = 'all 0.3s ease';
+      taskElement.style.opacity = '1';
+      taskElement.style.transform = 'scale(1)';
+    });
+  }
+
+  // Legacy method for backward compatibility
+  async updateTaskStatus(taskId, status) {
+    this.updateTaskStatusOptimistic(taskId, status);
+  }
+
+  // Optimistic auto-complete subtasks
+  autoCompleteSubtasksOptimistic(parentTaskId) {
+    console.log(`Optimistic auto-completing subtasks for parent task ${parentTaskId}...`);
+    
+    // Get current tasks from state manager
+    const currentState = stateManager.getState();
+    const tasks = currentState.tasks;
+    
+    // Find the parent task and its subtasks
+    const parentTask = tasks.find(task => task.id === parentTaskId);
+    if (!parentTask || !parentTask.subtasks || parentTask.subtasks.length === 0) {
+      console.log(`No subtasks found for parent task ${parentTaskId}`);
+      return;
     }
+    
+    console.log(`Found ${parentTask.subtasks.length} subtasks to auto-complete`);
+    
+    // Auto-complete all subtasks that are not already completed
+    const incompleteSubtasks = parentTask.subtasks.filter(subtask => !subtask.completed);
+    console.log(`Found ${incompleteSubtasks.length} incomplete subtasks to complete`);
+    
+    // Update each incomplete subtask optimistically
+    incompleteSubtasks.forEach(subtask => {
+      console.log(`Auto-completing subtask ${subtask.id}: ${subtask.title}`);
+      
+      // Update state immediately
+      stateManager.optimisticUpdateSubtaskCompletion(subtask.id, true);
+      
+      // Add to sync queue for background update
+      stateManager.addToSyncQueue({
+        key: `subtask-${subtask.id}`,
+        type: 'subtask-completion',
+        subtaskId: subtask.id,
+        completed: true
+      });
+    });
+    
+    console.log(`✅ Auto-completed ${incompleteSubtasks.length} subtasks for parent task ${parentTaskId}`);
+  }
+
+  // Legacy method for backward compatibility
+  async autoCompleteSubtasks(parentTaskId) {
+    this.autoCompleteSubtasksOptimistic(parentTaskId);
   }
 
   addSubtask(parentTaskId) {

@@ -207,6 +207,7 @@ export class ProjectComponent {
 
   setupProjectDragAndDrop(projectEl, project) {
     let draggedProject = null;
+    let dragOverQuadrant = null;
 
     // Drag start
     projectEl.addEventListener('dragstart', (e) => {
@@ -214,15 +215,33 @@ export class ProjectComponent {
       projectEl.classList.add('dragging');
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/html', projectEl.outerHTML);
+      
+      // Add visual feedback
+      projectEl.style.opacity = '0.5';
+      projectEl.style.transform = 'rotate(5deg)';
+      
+      // Add drag preview
+      const dragImage = projectEl.cloneNode(true);
+      dragImage.style.transform = 'rotate(5deg)';
+      dragImage.style.opacity = '0.8';
+      document.body.appendChild(dragImage);
+      e.dataTransfer.setDragImage(dragImage, 0, 0);
+      setTimeout(() => document.body.removeChild(dragImage), 0);
     });
 
     // Drag end
     projectEl.addEventListener('dragend', (e) => {
       projectEl.classList.remove('dragging');
+      projectEl.style.opacity = '';
+      projectEl.style.transform = '';
       draggedProject = null;
+      dragOverQuadrant = null;
+      
       // Remove dragover class from all quadrants
       $$('.eisenhower-quadrant').forEach(quadrant => {
         quadrant.classList.remove('dragover');
+        quadrant.style.backgroundColor = '';
+        quadrant.style.border = '';
       });
     });
 
@@ -231,46 +250,102 @@ export class ProjectComponent {
       quadrant.addEventListener('dragover', (e) => {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
+        
+        // Remove previous dragover
+        $$('.eisenhower-quadrant').forEach(quad => {
+          quad.classList.remove('dragover');
+          quad.style.backgroundColor = '';
+          quad.style.border = '';
+        });
+        
+        // Add dragover to current quadrant
         quadrant.classList.add('dragover');
+        dragOverQuadrant = quadrant;
+        
+        // Add visual feedback
+        quadrant.style.backgroundColor = 'rgba(0, 123, 255, 0.1)';
+        quadrant.style.border = '2px dashed #007bff';
       });
 
       quadrant.addEventListener('dragleave', (e) => {
-        quadrant.classList.remove('dragover');
+        // Only remove if we're actually leaving the quadrant
+        if (!quadrant.contains(e.relatedTarget)) {
+          quadrant.classList.remove('dragover');
+          quadrant.style.backgroundColor = '';
+          quadrant.style.border = '';
+        }
       });
 
       quadrant.addEventListener('drop', async (e) => {
         e.preventDefault();
         quadrant.classList.remove('dragover');
+        quadrant.style.backgroundColor = '';
+        quadrant.style.border = '';
         
-        if (draggedProject && draggedProject.id !== project.id) {
+        if (draggedProject) {
           const newQuadrant = quadrant.getAttribute('data-quadrant');
           if (newQuadrant && newQuadrant !== project.quadrant) {
-            try {
-              await this.updateProjectQuadrant(project.id, newQuadrant);
-            } catch (error) {
-              console.error('Failed to update project quadrant:', error);
-              eventBus.emit(EVENTS.ERROR_OCCURRED, error);
-            }
+            // Optimistic update - immediate UI feedback
+            this.updateProjectQuadrantOptimistic(project.id, newQuadrant);
           }
         }
       });
     });
   }
 
-  async updateProjectQuadrant(projectId, quadrant) {
-    try {
-      stateManager.setLoading(true);
-      const response = await apiService.updateProjectQuadrant(projectId, quadrant);
-      
-      // Reload projects to reflect the change
-      await this.loadProjects();
-      eventBus.emit(EVENTS.PROJECT_UPDATED, response.project);
-    } catch (error) {
-      console.error('Failed to update project quadrant:', error);
-      eventBus.emit(EVENTS.ERROR_OCCURRED, error);
-    } finally {
-      stateManager.setLoading(false);
+  // Optimistic update for project quadrant
+  updateProjectQuadrantOptimistic(projectId, newQuadrant) {
+    console.log(`Optimistic update: Moving project ${projectId} to quadrant ${newQuadrant}`);
+    
+    // Update state immediately
+    const updatedProject = stateManager.optimisticUpdateProjectQuadrant(projectId, newQuadrant);
+    if (!updatedProject) {
+      console.error('Failed to update project in state');
+      return;
     }
+
+    // Move project visually in DOM immediately
+    this.moveProjectInDOM(projectId, newQuadrant);
+    
+    // Add to sync queue for background update
+    stateManager.addToSyncQueue({
+      key: `project-${projectId}`,
+      type: 'project-quadrant',
+      projectId,
+      newQuadrant
+    });
+    
+    // Emit event for other components
+    eventBus.emit(EVENTS.PROJECT_UPDATED, updatedProject);
+  }
+
+  // Move project in DOM without reloading
+  moveProjectInDOM(projectId, newQuadrant) {
+    const projectElement = document.querySelector(`[data-project-id="${projectId}"]`);
+    if (!projectElement) return;
+
+    const targetQuadrant = document.querySelector(`#${newQuadrant}-projects`);
+    if (!targetQuadrant) return;
+
+    // Remove from current position
+    projectElement.remove();
+    
+    // Add to new position with animation
+    projectElement.style.opacity = '0';
+    projectElement.style.transform = 'scale(0.8)';
+    targetQuadrant.appendChild(projectElement);
+    
+    // Animate in
+    requestAnimationFrame(() => {
+      projectElement.style.transition = 'all 0.3s ease';
+      projectElement.style.opacity = '1';
+      projectElement.style.transform = 'scale(1)';
+    });
+  }
+
+  // Legacy method for backward compatibility
+  async updateProjectQuadrant(projectId, quadrant) {
+    this.updateProjectQuadrantOptimistic(projectId, quadrant);
   }
 
   truncateDescription(description, maxLength = 120) {
