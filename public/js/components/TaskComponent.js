@@ -48,6 +48,9 @@ export class TaskComponent {
     eventBus.on(EVENTS.TASK_CREATED, () => this.loadTasks());
     eventBus.on(EVENTS.TASK_UPDATED, () => this.loadTasks());
     eventBus.on(EVENTS.TASK_DELETED, () => this.loadTasks());
+    
+    // Listen for task status changes to update project progress
+    eventBus.on(EVENTS.TASK_STATUS_CHANGED, () => this.updateProjectProgress());
   }
 
   async loadTasks() {
@@ -63,37 +66,7 @@ export class TaskComponent {
         sortBy: $('#sortBy').value
       };
       
-      console.log('Loading tasks for project:', currentProject.id, 'with filters:', filters);
       const response = await apiService.getTasksByProject(currentProject.id, filters);
-      console.log('API Response:', response);
-      console.log('Tasks received:', response.tasks);
-      
-      // Debug: Log each task and its subtasks
-      response.tasks.forEach((task, index) => {
-        console.log(`Task ${index + 1}:`, {
-          id: task.id,
-          title: task.title,
-          parent_task_id: task.parent_task_id,
-          status: task.status,
-          subtasks: task.subtasks || [],
-          subtaskCount: (task.subtasks || []).length
-        });
-        
-        // Debug subtasks in detail
-        if (task.subtasks && task.subtasks.length > 0) {
-          task.subtasks.forEach((subtask, subIndex) => {
-            console.log(`  Subtask ${subIndex + 1}:`, {
-              id: subtask.id,
-              title: subtask.title,
-              status: subtask.status,
-              completed: subtask.completed,
-              parent_task_id: subtask.parent_task_id,
-              checked: subtask.completed,
-              completedType: typeof subtask.completed
-            });
-          });
-        }
-      });
       
       stateManager.setTasks(response.tasks);
       this.renderTasks(response.tasks);
@@ -107,8 +80,6 @@ export class TaskComponent {
   }
 
   renderTasks(tasks) {
-    console.log('renderTasks called with:', tasks);
-    
     // Clear existing tasks
     const columns = {
       'To Do': $('#list-todo'),
@@ -122,12 +93,10 @@ export class TaskComponent {
 
     // Filter out subtasks - only render parent tasks
     const parentTasks = tasks.filter(task => !task.parent_task_id);
-    console.log(`Found ${parentTasks.length} parent tasks to render`);
 
     // Render each parent task with its subtasks
     parentTasks.forEach(task => {
       const taskSubtasks = task.subtasks || [];
-      console.log(`Rendering task ${task.id} with ${taskSubtasks.length} subtasks:`, taskSubtasks);
       const taskElement = this.createTaskElement(task, taskSubtasks);
       const column = columns[task.status];
       if (column) {
@@ -145,8 +114,6 @@ export class TaskComponent {
 
   createTaskElement(task, subtasks = []) {
     const isSubtask = task.parent_task_id !== null;
-    console.log(`Creating task element for task ${task.id} with ${subtasks.length} subtasks:`, subtasks);
-    console.log(`Task parent_task_id: ${task.parent_task_id}, isSubtask: ${isSubtask}`);
     const children = [
       el('div', { className: 'task-header' }, [
         el('div', { className: 'task-main' }, [
@@ -183,7 +150,6 @@ export class TaskComponent {
             className: 'btn-icon add-subtask',
             title: 'Add subtask',
             onclick: () => {
-              console.log('Add subtask clicked for task:', task.id);
               this.addSubtask(task.id);
             }
           }, [
@@ -202,18 +168,11 @@ export class TaskComponent {
 
     // Add subtasks section for parent tasks
     if (!isSubtask) {
-      console.log(`Adding subtasks section for parent task ${task.id} with ${subtasks.length} subtasks`);
-      console.log(`Subtasks data:`, subtasks);
-      
       // Calculate subtask completion stats
       const completedSubtasks = subtasks.filter(subtask => subtask.completed).length;
       const subtaskProgress = subtasks.length > 0 ? Math.round((completedSubtasks / subtasks.length) * 100) : 0;
-      console.log(`Subtask stats: ${completedSubtasks}/${subtasks.length} completed (${subtaskProgress}%)`);
       
       const subtaskElements = subtasks.map(subtask => {
-        console.log(`Creating subtask element for:`, subtask);
-        console.log(`Subtask ${subtask.id} completed: ${subtask.completed}, checked: ${subtask.completed}`);
-        
         const checkbox = el('input', {
           type: 'checkbox',
           className: 'subtask-checkbox',
@@ -222,12 +181,6 @@ export class TaskComponent {
           'data-subtask-title': subtask.title,
           'data-subtask-completed': subtask.completed
         });
-
-        console.log(`🔍 CHECKBOX CREATED - ID: ${subtask.id}`);
-        console.log(`   Completed: ${subtask.completed}`);
-        console.log(`   Checked attribute: ${subtask.completed}`);
-        console.log(`   Checkbox element:`, checkbox);
-        console.log(`   Checkbox.checked property: ${checkbox.checked}`);
 
         const subtaskElement = el('div', { className: 'subtask-item' }, [
           checkbox,
@@ -248,46 +201,21 @@ export class TaskComponent {
         ]);
 
         // Add event listeners after element creation
-        checkbox.addEventListener('click', (e) => {
-          console.log(`🔘 CHECKBOX CLICKED - ID: ${subtask.id}, Title: ${subtask.title}`);
-          console.log(`Before change - Checked: ${e.target.checked}, Completed: ${subtask.completed}`);
-        });
-
         checkbox.addEventListener('change', (e) => {
-          console.log(`=== SUBTASK CHECKBOX CHANGED ===`);
-          console.log(`Subtask ID: ${subtask.id}`);
-          console.log(`Subtask Title: ${subtask.title}`);
-          console.log(`Current Completed: ${subtask.completed}`);
-          console.log(`Checkbox Checked: ${e.target.checked}`);
-          console.log(`New Completed Will Be: ${e.target.checked}`);
-          console.log(`Event Target:`, e.target);
-          console.log(`Event Type: ${e.type}`);
-          
           // Prevent multiple rapid clicks
           if (e.target.disabled) {
-            console.log(`❌ Checkbox is disabled, ignoring change`);
             return;
           }
           
-          console.log(`✅ Processing checkbox change...`);
           e.target.disabled = true;
           
           this.toggleSubtaskCompletion(subtask.id, e.target.checked).finally(() => {
-            console.log(`✅ Checkbox operation completed, re-enabling`);
             e.target.disabled = false;
-            console.log(`🔍 CHECKBOX RE-ENABLED - ID: ${subtask.id}, checked: ${e.target.checked}`);
           });
         });
 
-        console.log(`🔍 AFTER EVENT LISTENERS - ID: ${subtask.id}`);
-        console.log(`   Checkbox.checked property: ${checkbox.checked}`);
-        console.log(`   Checkbox element:`, checkbox);
-        
-        console.log(`Created subtask element for ${subtask.id}:`, subtaskElement);
         return subtaskElement;
       });
-      
-      console.log(`Created ${subtaskElements.length} subtask elements`);
       
       const subtasksSection = el('div', { className: 'subtasks-section' }, [
         el('div', { className: 'subtasks-header' }, [
@@ -311,7 +239,6 @@ export class TaskComponent {
         subtasks.length > 0 ? el('div', { className: 'subtasks-list' }, subtaskElements) : el('div', { className: 'subtasks-list empty', textContent: 'No subtasks yet - click + to add one' })
       ]);
       
-      console.log(`Created subtasks section:`, subtasksSection);
       children.push(subtasksSection);
     }
 
@@ -356,6 +283,7 @@ export class TaskComponent {
       
       this.newTaskForm.reset();
       eventBus.emit(EVENTS.TASK_CREATED, response.task);
+      this.updateProjectProgress();
     } catch (error) {
       console.error('Failed to create task:', error);
       eventBus.emit(EVENTS.ERROR_OCCURRED, error);
@@ -392,6 +320,7 @@ export class TaskComponent {
       
       this.hideTaskModal();
       eventBus.emit(EVENTS.TASK_UPDATED, response.task);
+      this.updateProjectProgress();
     } catch (error) {
       console.error('Failed to update task:', error);
       eventBus.emit(EVENTS.ERROR_OCCURRED, error);
@@ -419,6 +348,7 @@ export class TaskComponent {
       stateManager.setLoading(true);
       await apiService.deleteTask(taskId);
       eventBus.emit(EVENTS.TASK_DELETED, taskId);
+      this.updateProjectProgress();
     } catch (error) {
       console.error('Failed to delete task:', error);
       eventBus.emit(EVENTS.ERROR_OCCURRED, error);
@@ -429,8 +359,6 @@ export class TaskComponent {
 
 
   updateSubtaskInLocalState(subtaskId, newCompleted) {
-    console.log(`🔄 Updating local state for subtask ${subtaskId} to completed: ${newCompleted}`);
-    
     // Get current tasks from state manager
     const currentState = stateManager.getState();
     const tasks = currentState.tasks;
@@ -442,7 +370,6 @@ export class TaskComponent {
         if (task.subtasks && Array.isArray(task.subtasks)) {
           const updatedSubtasks = task.subtasks.map(subtask => {
             if (subtask.id === subtaskId) {
-              console.log(`Found subtask ${subtaskId} in task ${task.id}, updating completed from ${subtask.completed} to ${newCompleted}`);
               updated = true;
               return { ...subtask, completed: newCompleted };
             }
@@ -459,13 +386,11 @@ export class TaskComponent {
       if (updated) {
         // Update the state manager with the modified tasks
         stateManager.setTasks(updatedTasks);
-        console.log(`✅ Updated state manager with modified tasks`);
       }
       
       // Update the checkbox in the DOM directly
       const checkbox = document.querySelector(`[data-subtask-id="${subtaskId}"]`);
       if (checkbox) {
-        console.log(`Updating checkbox for subtask ${subtaskId}, setting checked to: ${newCompleted}`);
         checkbox.checked = newCompleted;
         
         // Update the subtask title styling
@@ -481,16 +406,10 @@ export class TaskComponent {
         console.warn(`Could not find checkbox for subtask ${subtaskId}`);
       }
     }
-    
-    console.log(`✅ Local state updated for subtask ${subtaskId}`);
   }
 
   // Optimistic subtask completion toggle
   toggleSubtaskCompletionOptimistic(subtaskId, completed) {
-    console.log(`=== OPTIMISTIC SUBTASK UPDATE START ===`);
-    console.log(`Subtask ID: ${subtaskId}`);
-    console.log(`New completed: ${completed}`);
-    
     // Update state immediately
     const success = stateManager.optimisticUpdateSubtaskCompletion(subtaskId, completed);
     if (!success) {
@@ -511,9 +430,6 @@ export class TaskComponent {
     
     // Emit event to notify other components
     eventBus.emit(EVENTS.TASK_STATUS_CHANGED, { id: subtaskId, completed });
-    
-    console.log(`✅ Optimistic subtask update completed`);
-    console.log(`=== OPTIMISTIC SUBTASK UPDATE END ===`);
   }
 
   // Legacy method for backward compatibility
@@ -639,8 +555,6 @@ export class TaskComponent {
 
   // Optimistic update for task status
   updateTaskStatusOptimistic(taskId, newStatus) {
-    console.log(`Optimistic update: Moving task ${taskId} to ${newStatus}`);
-    
     // Update state immediately
     const updatedTask = stateManager.optimisticUpdateTaskStatus(taskId, newStatus);
     if (!updatedTask) {
@@ -661,7 +575,6 @@ export class TaskComponent {
 
     // If task is moved to "Done", auto-complete all its subtasks
     if (newStatus === 'Done') {
-      console.log(`Task ${taskId} moved to Done, auto-completing all subtasks...`);
       this.autoCompleteSubtasksOptimistic(taskId);
     }
     
@@ -704,8 +617,6 @@ export class TaskComponent {
 
   // Optimistic auto-complete subtasks
   autoCompleteSubtasksOptimistic(parentTaskId) {
-    console.log(`Optimistic auto-completing subtasks for parent task ${parentTaskId}...`);
-    
     // Get current tasks from state manager
     const currentState = stateManager.getState();
     const tasks = currentState.tasks;
@@ -713,20 +624,14 @@ export class TaskComponent {
     // Find the parent task and its subtasks
     const parentTask = tasks.find(task => task.id === parentTaskId);
     if (!parentTask || !parentTask.subtasks || parentTask.subtasks.length === 0) {
-      console.log(`No subtasks found for parent task ${parentTaskId}`);
       return;
     }
     
-    console.log(`Found ${parentTask.subtasks.length} subtasks to auto-complete`);
-    
     // Auto-complete all subtasks that are not already completed
     const incompleteSubtasks = parentTask.subtasks.filter(subtask => !subtask.completed);
-    console.log(`Found ${incompleteSubtasks.length} incomplete subtasks to complete`);
     
     // Update each incomplete subtask optimistically
     incompleteSubtasks.forEach(subtask => {
-      console.log(`Auto-completing subtask ${subtask.id}: ${subtask.title}`);
-      
       // Update state immediately
       stateManager.optimisticUpdateSubtaskCompletion(subtask.id, true);
       
@@ -738,8 +643,6 @@ export class TaskComponent {
         completed: true
       });
     });
-    
-    console.log(`✅ Auto-completed ${incompleteSubtasks.length} subtasks for parent task ${parentTaskId}`);
   }
 
   // Legacy method for backward compatibility
@@ -748,15 +651,12 @@ export class TaskComponent {
   }
 
   addSubtask(parentTaskId) {
-    console.log('addSubtask called with parentTaskId:', parentTaskId);
     this.currentParentTaskId = parentTaskId;
     this.showSubtaskModal();
   }
 
   async handleCreateSubtask(e) {
     e.preventDefault();
-    
-    console.log('handleCreateSubtask called with parentTaskId:', this.currentParentTaskId);
     
     if (!this.currentParentTaskId) {
       console.error('No parent task ID set');
@@ -767,8 +667,6 @@ export class TaskComponent {
     const description = $('#subtaskDescription').value.trim();
     const priority = $('#subtaskPriority').value;
     const dueDate = $('#subtaskDueDate').value || null;
-
-    console.log('Subtask data:', { title, description, priority, dueDate, parentTaskId: this.currentParentTaskId });
 
     if (!title) {
       alert('Subtask title is required');
@@ -783,7 +681,6 @@ export class TaskComponent {
 
     try {
       stateManager.setLoading(true);
-      console.log('Calling API to create subtask...');
       const response = await apiService.createTask(
         currentProject.id,
         title,
@@ -795,14 +692,12 @@ export class TaskComponent {
         false // completed: false by default for new subtasks
       );
       
-      console.log('API response:', response);
-      console.log('Created subtask:', response.task);
       this.hideSubtaskModal();
       eventBus.emit(EVENTS.TASK_CREATED, response.task);
       // Force reload tasks to ensure subtasks appear
       setTimeout(() => {
-        console.log('Force reloading tasks...');
         this.loadTasks();
+        this.updateProjectProgress();
       }, 100);
     } catch (error) {
       console.error('Failed to create subtask:', error);
@@ -813,8 +708,6 @@ export class TaskComponent {
   }
 
   showSubtaskModal() {
-    console.log('showSubtaskModal called');
-    console.log('subtaskModal element:', this.subtaskModal);
     this.subtaskModal.hidden = false;
     $('#subtaskTitle').focus();
   }
@@ -823,6 +716,30 @@ export class TaskComponent {
     this.subtaskModal.hidden = true;
     this.subtaskForm.reset();
     this.currentParentTaskId = null;
+  }
+
+  updateProjectProgress() {
+    // Update the project page progress bar when tasks change
+    const currentState = stateManager.getState();
+    const currentProject = currentState.currentProject;
+    const tasks = currentState.tasks || [];
+    
+    if (currentProject) {
+      const totalTasks = tasks.length;
+      const completedTasks = tasks.filter(t => t.status === 'Done').length;
+      const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+      
+      // Update the project page progress bar
+      const progressText = $('#progressText');
+      const progressFill = $('#progressFill');
+      const totalTasksEl = $('#totalTasks');
+      const completedTasksEl = $('#completedTasks');
+      
+      if (progressText) progressText.textContent = `${progress}%`;
+      if (progressFill) progressFill.style.width = `${progress}%`;
+      if (totalTasksEl) totalTasksEl.textContent = totalTasks;
+      if (completedTasksEl) completedTasksEl.textContent = completedTasks;
+    }
   }
 
   formatDueDate(dueDate) {

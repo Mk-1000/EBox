@@ -94,6 +94,11 @@ export const EVENTS = {
   DRAG_START: 'ui:dragStart',
   DRAG_END: 'ui:dragEnd',
   
+  // Progress events
+  PROGRESS_UPDATED: 'progress:updated',
+  PROGRESS_BATCH_UPDATED: 'progress:batchUpdated',
+  PROGRESS_CACHE_INVALIDATED: 'progress:cacheInvalidated',
+  
   // Error events
   ERROR_OCCURRED: 'error:occurred',
   ERROR_CLEARED: 'error:cleared'

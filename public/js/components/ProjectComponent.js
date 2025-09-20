@@ -4,6 +4,8 @@ import { apiService } from '../services/api.js';
 import { stateManager } from '../core/state.js';
 import { eventBus, EVENTS } from '../core/events.js';
 import { QUADRANTS } from '../core/constants.js';
+import { progressManager } from '../core/ProgressManager.js';
+import { progressAnalytics } from '../core/ProgressAnalytics.js';
 
 export class ProjectComponent {
   constructor() {
@@ -20,6 +22,9 @@ export class ProjectComponent {
   initialize() {
     this.setupEventListeners();
     this.loadProjects();
+    
+    // Set up periodic progress bar updates
+    this.setupProgressBarRefresh();
   }
 
   setupEventListeners() {
@@ -34,6 +39,15 @@ export class ProjectComponent {
     // Listen for events
     eventBus.on(EVENTS.PROJECT_CREATED, () => this.loadProjects());
     eventBus.on(EVENTS.PROJECT_DELETED, () => this.loadProjects());
+    
+    // Listen for task changes to update progress bars dynamically
+    eventBus.on(EVENTS.TASK_CREATED, () => this.updateAllProgressBars());
+    eventBus.on(EVENTS.TASK_UPDATED, () => this.updateAllProgressBars());
+    eventBus.on(EVENTS.TASK_DELETED, () => this.updateAllProgressBars());
+    eventBus.on(EVENTS.TASK_STATUS_CHANGED, () => this.updateAllProgressBars());
+    
+    // Listen for state changes to update progress bars
+    stateManager.subscribe('tasks', () => this.updateAllProgressBars());
   }
 
   async loadProjects() {
@@ -85,6 +99,11 @@ export class ProjectComponent {
   }
 
   createProjectElement(project) {
+    // Get progress from cache or use default
+    const cachedProgress = progressManager.getProjectProgress(project.id);
+    const progress = cachedProgress ? cachedProgress.progress : 0;
+    const totalTasks = cachedProgress ? cachedProgress.totalTasks : (project.totalTasks || 0);
+    
     const projectEl = el('div', {
       className: 'project-card',
       'data-project-id': project.id,
@@ -99,7 +118,7 @@ export class ProjectComponent {
         el('div', { className: 'project-status' }, [
           el('span', { 
             className: 'task-count',
-            textContent: `${project.totalTasks || 0} tasks` 
+            textContent: `${totalTasks} tasks` 
           })
         ])
       ]),
@@ -111,11 +130,11 @@ export class ProjectComponent {
         el('div', { className: 'progress-bar' }, [
           el('div', { 
             className: 'progress-fill',
-            style: `width: ${project.progress || 0}%`
+            style: `width: ${progress}%`
           }),
           el('span', { 
             className: 'progress-text',
-            textContent: `${project.progress || 0}%`
+            textContent: `${progress}%`
           })
         ])
       ])
@@ -123,6 +142,11 @@ export class ProjectComponent {
 
     // Add drag and drop event listeners
     this.setupProjectDragAndDrop(projectEl, project);
+
+    // Queue for progress update if not cached
+    if (!cachedProgress) {
+      progressManager.forceRefreshProject(project.id);
+    }
 
     return projectEl;
   }
@@ -156,6 +180,14 @@ export class ProjectComponent {
     this.projectPage.hidden = true;
     this.projectsDashboard.hidden = false;
     stateManager.setCurrentProject(null);
+    
+    // Refresh projects to ensure progress bars are up to date
+    this.loadProjects();
+    
+    // Also update progress bars after a short delay to ensure DOM is ready
+    setTimeout(() => {
+      this.updateAllProgressBars();
+    }, 100);
   }
 
   showProjectModal() {
@@ -194,15 +226,104 @@ export class ProjectComponent {
     }
   }
 
+  calculateProjectProgress(project) {
+    // Get current tasks from state manager for real-time progress
+    const currentState = stateManager.getState();
+    const currentProject = currentState.currentProject;
+    
+    // Use current project tasks if available, otherwise use project tasks
+    const tasks = (currentProject && currentProject.id === project.id) ? 
+      currentState.tasks : (project.tasks || []);
+    
+    const totalTasks = tasks.length;
+    const completedTasks = tasks.filter(t => t.status === 'Done').length;
+    
+    return totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+  }
+
+  async calculateProjectProgressWithFreshData(project) {
+    try {
+      // Get fresh task data for this project
+      const response = await apiService.getTasksByProject(project.id);
+      const tasks = response.tasks || [];
+      
+      const totalTasks = tasks.length;
+      const completedTasks = tasks.filter(t => t.status === 'Done').length;
+      
+      return {
+        progress: totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0,
+        totalTasks,
+        completedTasks
+      };
+    } catch (error) {
+      console.error('Failed to get fresh task data for project:', project.id, error);
+      // Fallback to cached data
+      const tasks = project.tasks || [];
+      const totalTasks = tasks.length;
+      const completedTasks = tasks.filter(t => t.status === 'Done').length;
+      
+      return {
+        progress: totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0,
+        totalTasks,
+        completedTasks
+      };
+    }
+  }
+
   updateProjectStats(project) {
-    const totalTasks = project.tasks ? project.tasks.length : 0;
-    const completedTasks = project.tasks ? project.tasks.filter(t => t.status === 'Done').length : 0;
+    const currentState = stateManager.getState();
+    const tasks = currentState.tasks || [];
+    
+    const totalTasks = tasks.length;
+    const completedTasks = tasks.filter(t => t.status === 'Done').length;
     const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
     
     $('#totalTasks').textContent = totalTasks;
     $('#completedTasks').textContent = completedTasks;
     $('#progressText').textContent = `${progress}%`;
     $('#progressFill').style.width = `${progress}%`;
+  }
+
+  async updateProjectProgressAsync(projectElement, project) {
+    try {
+      const progressData = await this.calculateProjectProgressWithFreshData(project);
+      
+      const progressFill = projectElement.querySelector('.progress-fill');
+      const progressText = projectElement.querySelector('.progress-text');
+      const taskCount = projectElement.querySelector('.task-count');
+      
+      if (progressFill) {
+        progressFill.style.width = `${progressData.progress}%`;
+      }
+      if (progressText) {
+        progressText.textContent = `${progressData.progress}%`;
+      }
+      if (taskCount) {
+        taskCount.textContent = `${progressData.totalTasks} tasks`;
+      }
+    } catch (error) {
+      console.error('Failed to update project progress:', error);
+    }
+  }
+
+  updateAllProgressBars() {
+    // Update Eisenhower Box project progress bars
+    const currentState = stateManager.getState();
+    const projects = currentState.projects || [];
+    
+    projects.forEach(project => {
+      const projectElement = document.querySelector(`[data-project-id="${project.id}"]`);
+      if (projectElement) {
+        // Use async update for fresh data
+        this.updateProjectProgressAsync(projectElement, project);
+      }
+    });
+    
+    // Update project page progress bar if we're on a project page
+    const currentProject = currentState.currentProject;
+    if (currentProject && this.projectPage && !this.projectPage.hidden) {
+      this.updateProjectStats(currentProject);
+    }
   }
 
   setupProjectDragAndDrop(projectEl, project) {
@@ -295,8 +416,6 @@ export class ProjectComponent {
 
   // Optimistic update for project quadrant
   updateProjectQuadrantOptimistic(projectId, newQuadrant) {
-    console.log(`Optimistic update: Moving project ${projectId} to quadrant ${newQuadrant}`);
-    
     // Update state immediately
     const updatedProject = stateManager.optimisticUpdateProjectQuadrant(projectId, newQuadrant);
     if (!updatedProject) {
@@ -348,10 +467,26 @@ export class ProjectComponent {
     this.updateProjectQuadrantOptimistic(projectId, quadrant);
   }
 
+  setupProgressBarRefresh() {
+    // Refresh progress bars every 30 seconds when on Eisenhower Box dashboard
+    this.progressRefreshInterval = setInterval(() => {
+      if (this.projectsDashboard && !this.projectsDashboard.hidden) {
+        this.updateAllProgressBars();
+      }
+    }, 30000); // 30 seconds
+  }
+
   truncateDescription(description, maxLength = 120) {
     if (!description || description.length <= maxLength) {
       return description;
     }
     return description.substring(0, maxLength).trim() + '...';
+  }
+
+  // Cleanup method
+  destroy() {
+    if (this.progressRefreshInterval) {
+      clearInterval(this.progressRefreshInterval);
+    }
   }
 }

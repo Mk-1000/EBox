@@ -6,6 +6,7 @@ import { ProjectComponent } from './components/ProjectComponent.js';
 import { TaskComponent } from './components/TaskComponent.js';
 import { ThemeComponent } from './components/ThemeComponent.js';
 import { SyncStatusComponent } from './components/SyncStatusComponent.js';
+import { ProgressDashboard } from './components/ProgressDashboard.js';
 
 class EBoxApp {
   constructor() {
@@ -24,6 +25,7 @@ class EBoxApp {
       this.components.project = new ProjectComponent();
       this.components.task = new TaskComponent();
       this.components.syncStatus = new SyncStatusComponent();
+      this.components.progressDashboard = new ProgressDashboard();
       
       // Setup global error handling
       this.setupErrorHandling();
