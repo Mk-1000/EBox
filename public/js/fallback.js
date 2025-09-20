@@ -2,7 +2,7 @@
 // Check if modules loaded successfully
 window.addEventListener('load', () => {
   setTimeout(() => {
-    if (!window.EBoxAppLoaded) {
+    if (!window.EBoxAppLoaded && !window.moduleTestLoaded) {
       console.error('EBox app failed to load - checking for module errors');
       
       // Check for specific module loading errors
